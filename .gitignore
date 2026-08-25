@@ -20,8 +20,9 @@ venv/
 *.nam
 *.til
 
-# spectrIDA runtime output
-output/
+# spectrIDA runtime output (repo root only — stage outputs under
+# stages/*/output/ are workspace records and MUST be committed)
+/output/
 
 # env / secrets
 .env
