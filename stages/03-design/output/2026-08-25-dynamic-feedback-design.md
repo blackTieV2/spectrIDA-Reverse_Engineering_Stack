@@ -27,8 +27,30 @@ evaporates. This feature persists it:
 
 # Stage
 
-03-design. This document is the only output. Build requires explicit user
-approval.
+03-design. Build of the **revised scope (002a)** approved by the user
+2026-08-25 after pre-build verification falsified part of this packet.
+
+## ⚠️ Scope revision 002a (supersedes sections below where they conflict)
+
+Pre-build verification (grep + tool-body reads) found:
+
+- `hunt_crashes` and `live_trace` MCP tools **already annotate** the graph
+  via `annotator()` (`dyn_status`, `dyn_crashes`, `dyn_live_ran`, …);
+  `dynamic_overview` already reads those annotations. The packet's premise
+  "verdicts evaporate" was wrong for the graph leg.
+- `annotate.py`'s `annotator()` factory and atlas's `GraphAnnotator`
+  (SET-only, prefixed, timestamped) already constitute the writer.
+
+**002a retains only the genuine gaps:**
+
+1. Provenance: producers stamp `dyn_source: "phantomrt-alpha"` + `dyn_run_id`.
+2. `spectrida/okf_bridge.py`: crash verdict → OKF failure-pattern card
+   (deduped per function+run).
+3. TUI markers (`▶`/`✖`/`?`) via a guarded optional graph read — blank
+   column when no graph configured.
+
+**Dropped:** annotation writer, producer hooks, `annotated` return fields,
+overview reader (all pre-existing).
 
 # Current Verified State
 
