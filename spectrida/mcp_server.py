@@ -751,6 +751,37 @@ async def explain_function(binary: str, address: str, depth: int = 2,
 
 
 @mcp.tool()
+async def apply_patch(binary: str, address: str, hex_bytes: str) -> dict:
+    """Patch bytes in the .i64 with journal-before-write + read-back verify.
+
+    Safety contract: a journal entry (old+new bytes) is written BEFORE the
+    database is touched; after patching, bytes are read back and must match,
+    else the patch auto-reverts. The patched window is Capstone-decoded in
+    the binary's own bitness so you see what the bytes MEAN.
+
+    Patches the .i64 ONLY — the original binary on disk is never modified.
+    Use list_patches() / revert_patch() to inspect and undo.
+    """
+    db = await _live_db(binary)
+    data = bytes.fromhex(hex_bytes.replace(" ", ""))
+    return await db.patch(_norm_addr(address), data)
+
+
+@mcp.tool()
+async def list_patches(binary: str) -> list[dict]:
+    """List all patch journal entries for a binary (patches + revert state)."""
+    db = await _live_db(binary)
+    return await db.list_patches()
+
+
+@mcp.tool()
+async def revert_patch(binary: str, patch_id: str) -> dict:
+    """Restore the original bytes recorded in a patch journal entry."""
+    db = await _live_db(binary)
+    return await db.revert_patch(patch_id)
+
+
+@mcp.tool()
 async def baseline_naming(binary: str, sample_size: int = 100) -> dict:
     """Phase 0: measure current naming accuracy on a sample of functions.
 

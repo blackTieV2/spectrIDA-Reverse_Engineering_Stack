@@ -123,6 +123,23 @@ class IDADatabase:
                     f["name"] = new_name
         return ok
 
+    # ── patching (.i64 only — never the source binary) ─────────────────────
+
+    async def patch(self, address: int | str, data: bytes) -> dict:
+        """Verified patch: journal-before-write, read-back check, decode list.
+
+        Patches the .i64 database only. Returns journal entry + verification
+        + Capstone-decoded instruction list for the patched window."""
+        return await self._b.verified_patch(address, data)
+
+    async def list_patches(self) -> list[dict]:
+        """All journal entries (patches + revert state) for this database."""
+        return await self._b.list_patches()
+
+    async def revert_patch(self, patch_id: str) -> dict:
+        """Restore the original bytes recorded in journal entry *patch_id*."""
+        return await self._b.revert_patch(patch_id)
+
     # ── AI naming ───────────────────────────────────────────────────────────
 
     async def name_function(

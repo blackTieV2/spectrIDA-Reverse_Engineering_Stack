@@ -39,6 +39,9 @@ class Backend:
     def stream_explain(self, addr, insns, context_block: str, pseudocode: str) -> AsyncIterator[str]: ...
     async def dyn_flags(self, addrs: list[int]) -> dict[int, str]:
         return {}
+    async def verified_patch(self, addr, data: bytes) -> dict: ...
+    async def list_patches(self) -> list[dict]: ...
+    async def revert_patch(self, patch_id: str) -> dict: ...
     async def close(self) -> None: ...
 
 
@@ -119,6 +122,17 @@ class RealBackend(Backend):
     async def close(self):
         if self._ida:
             await self._ida.close()
+
+
+    async def verified_patch(self, addr, data):
+        return await _ida.verified_patch(self._ida, addr, data)
+
+    async def list_patches(self):
+        from spectrida.core import patchlog
+        return patchlog.list_entries(self._ida.i64)
+
+    async def revert_patch(self, patch_id):
+        return await _ida.revert_patch(self._ida, patch_id)
 
 
 class DemoBackend(Backend):
