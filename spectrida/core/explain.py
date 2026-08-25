@@ -7,10 +7,13 @@ text (in ``Explanation.raw``) instead of raising.
 """
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator
 from dataclasses import asdict, dataclass, field
 
 from spectrida.core.ollama import _insn_line, stream_generate
+
+_STRING_RE = re.compile(r'"([^"]{3,80})"')
 
 EXPLAIN_SYSTEM = (
     "You are an expert reverse engineer. Given disassembly and call-graph "
@@ -42,6 +45,8 @@ _SECTIONS = (
 
 _CONFIDENCE_VALUES = {"high", "medium", "low"}
 
+_MAX_STRINGS = 10
+
 
 @dataclass
 class Explanation:
@@ -59,6 +64,43 @@ class Explanation:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def extract_strings_from_insns(insns: list[dict]) -> list[str]:
+    """Pull quoted ASCII literals out of disassembly operand text.
+
+    Cheap heuristic for the no-graph path (TUI/facade): IDA renders string
+    operands as ``offset aHelloWorld  ; "Hello world"`` — we take the quoted
+    part. Deduplicated, order-preserving, capped.
+    """
+    seen: list[str] = []
+    for i in insns:
+        text = i.get("text") or ""
+        for m in _STRING_RE.findall(text):
+            if m not in seen:
+                seen.append(m)
+                if len(seen) >= _MAX_STRINGS:
+                    return seen
+    return seen
+
+
+def build_context_block(
+    callers: list[str],
+    callees: list[str],
+    strings: list[str] | None = None,
+) -> str:
+    """Render call-graph context as a prompt block from plain data.
+
+    Mirrors the naming prompt's header style so the model sees a familiar
+    layout; used when no Neo4j graph is available (TUI / facade path).
+    """
+    lines = [
+        f"Calls: {', '.join(callees[:8]) or 'none'}",
+        f"Called by: {', '.join(callers[:8]) or 'none'}",
+    ]
+    if strings:
+        lines.append(f"Strings: {', '.join(strings[:_MAX_STRINGS])}")
+    return "\n".join(lines)
 
 
 def parse_explanation(text: str) -> Explanation:

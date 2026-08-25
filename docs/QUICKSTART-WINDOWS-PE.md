@@ -108,6 +108,7 @@ with 4 workers. Yours will vary — measure, don't trust.
 | Key | Action |
 |-----|--------|
 | `N` | AI-name selected function (streams live) |
+| `E` | AI-explain selected function (structured: purpose/behavior/IO/confidence) |
 | `B` | Batch-name every `sub_*` |
 | `R` | Rename manually (persists to the `.i64`) |
 | `D` | Toggle Hex-Rays pseudocode |

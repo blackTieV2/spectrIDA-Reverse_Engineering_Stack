@@ -295,8 +295,8 @@ async def emulate_function(binary: str, address: str, binary_path: str = "") -> 
     Requires the optional 'atlas' extra (pip install "spectrida[atlas]")."""
     from spectrida import dynamic
     dynamic.require()
-    from spectrida.dynamic.emulate import emulate_one
     from spectrida.dynamic.annotate import annotator
+    from spectrida.dynamic.emulate import emulate_one
 
     addr = _norm_addr(address)
     result = await asyncio.to_thread(
@@ -346,8 +346,8 @@ async def hunt_crashes(binary: str, address: str, seeds_dir: str = "",
     async def _run() -> None:
         job = _jobs[job_id]
         try:
-            from spectrida.dynamic.fuzz import hunt
             from spectrida.dynamic.annotate import annotator
+            from spectrida.dynamic.fuzz import hunt
 
             def prog(done, total, ncrash):
                 job["progress"] = f"fuzzing {done}/{total}, {ncrash} crashes"
@@ -445,8 +445,8 @@ async def live_trace(binary: str, addresses: list[str], binary_path: str = "",
     extra (pip install "spectrida[atlas]")."""
     from spectrida import dynamic
     dynamic.require()
-    from spectrida.dynamic.live import live_trace as _live_trace
     from spectrida.dynamic.annotate import annotator
+    from spectrida.dynamic.live import live_trace as _live_trace
 
     addrs = [_norm_addr(a) for a in addresses]
     result = await asyncio.to_thread(
@@ -655,7 +655,7 @@ async def get_context(binary: str, address: str, depth: int = 2,
     Use this to understand WHY a function would be named a certain way â€”
     the model sees this neighborhood when naming.
     """
-    from spectrida.context import gather_context, format_context_block
+    from spectrida.context import format_context_block, gather_context
 
     addr = _norm_addr(address)
     pseudocode = ""
@@ -1016,7 +1016,7 @@ async def get_referenced_knowledge(binary: str, address: str) -> dict:
     Use this to preview what context a function would receive before
     a naming run.
     """
-    from spectrida.idb_knowledge import harvest_references, gather_knowledge
+    from spectrida.idb_knowledge import gather_knowledge, harvest_references
 
     db = await _live_db(binary)
     addr = _norm_addr(address)
@@ -1070,7 +1070,6 @@ async def verify_decompilation(
 
     Returns verified C code if the oracle confirms equivalence.
     """
-    from spectrida.verify.lift import lift_function
 
     db = await _live_db(binary)
     addr = _norm_addr(address)
@@ -1123,7 +1122,6 @@ async def scale_verify(binary: str, sample_size: int = 20) -> dict:
             }
             job["progress"] = "complete"
         except Exception as exc:
-            import traceback
             job["status"] = "error"
             job["error"] = f"{type(exc).__name__}: {exc}"
 

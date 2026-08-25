@@ -280,10 +280,52 @@ format turns out to differ from the streaming assumptions in
 
 # Final Report
 
-To be appended here by the build agent: commits produced, evidence
-locations, deviations from this packet (with reasons), live-acceptance
-table, and rollback confirmation (revert = drop the new module + binding;
-no data migrations exist).
+**Build completed 2026-08-25** (automated criteria only; live criteria 4–6
+remain for the user's machine).
+
+## Commits produced
+
+| Commit | Message |
+|---|---|
+| `c2e81eb` | refactor(core): extract stream_generate transport from stream_name |
+| `0bbcb70` | feat(core): explain prompt contract with tolerant parser |
+| `8f58195` | feat(mcp): explain_function tool (33rd) |
+| `3accc71` | feat(api,tui): E-key explain mode with demo support |
+| `fd07670` | test: explain contract, context helpers, facade and demo streams |
+
+## Evidence
+
+- Full suite: **55 passed** (35 pre-existing + 20 new), `--ignore=tests/phantomrt`.
+- Ruff clean on all 9 changed/new files (13 import-order findings auto-fixed).
+- Naming regression pin: `_build_prompt` byte-identical snapshot test passes
+  post-refactor (`test_build_prompt_is_byte_identical`).
+
+## Deviations from packet
+
+1. `explain.py` gained two pure helpers (`extract_strings_from_insns`,
+   `build_context_block`) — the TUI/facade context path needed them; same
+   file, same module, no new scope.
+2. TUI renderer buffers into complete lines before writing to the
+   RichLog-based DisasmPane (token-level writes don't map onto a log
+   widget); streaming behaviour preserved line-by-line.
+3. One self-caught bug during build: explanation text was consumed by the
+   line-buffer before parsing; fixed by accumulating the full stream
+   separately. Caught pre-commit.
+4. `temperature=0.2` passed explicitly in the explain call (contract
+   clarity; identical value to the default).
+
+## Live-acceptance table (pending — user machine)
+
+| # | Criterion | Status |
+|---|---|---|
+| 4 | `--demo` → E streams an explanation | ☐ pending |
+| 5 | `target.exe`: factorial→recursion, add→leaf, main→printf | ☐ pending |
+| 6 | ≥80% useful on 20 functions; ≤30 s each | ☐ pending |
+
+## Rollback confirmation
+
+Additive-only: revert commits `c2e81eb..fd07670`. No migrations; the
+naming path is snapshot-pinned.
 
 # Rollback
 
