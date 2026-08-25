@@ -23,6 +23,12 @@ class FuncList(Widget, can_focus=True):
         self._items: list[dict] = []
         self.cursor = 0
         self.top = 0
+        self._dyn: dict[int, str] = {}
+
+    def set_dyn_flags(self, flags: dict[int, str]) -> None:
+        """Runtime-evidence markers keyed by function start address."""
+        self._dyn = flags or {}
+        self.refresh()
 
     def set_functions(self, funcs: list[dict]) -> None:
         self._all = funcs
@@ -93,6 +99,9 @@ class FuncList(Widget, can_focus=True):
             sub = is_sub(f["name"])
             t = Text()
             addr = f"{f['start']:08x}"[-8:]
+            mark = self._dyn.get(f["start"], " ")
+            mark_style = {"✖": "#ef4444", "▶": "#22c55e", "?": "#f59e0b"}.get(mark, "#374151")
+            t.append(f"{mark} ", Style(color=mark_style))
             t.append(f" {addr} ", Style(color="#374151"))
             t.append(f["name"], Style(color="#4a5568" if sub else "#e2e8f0", bold=not sub))
             sz = fmt_size(f.get("size", 0))

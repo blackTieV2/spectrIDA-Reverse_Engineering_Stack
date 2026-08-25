@@ -90,6 +90,12 @@ class BrowserScreen(Screen):
             return
         fl = self.query_one("#func-list", FuncList)
         fl.set_functions(funcs)
+        try:
+            flags = await self._b.dyn_flags([f["start"] for f in funcs])
+            if flags:
+                fl.set_dyn_flags(flags)
+        except Exception:
+            pass  # markers are decoration; never break the list over them
         fl.focus()  # focus immediately so keyboard works as soon as list appears
         named = sum(1 for f in funcs if not is_sub(f["name"]))
         self.query_one("#func-count", Label).update(f"  {len(funcs):,} funcs · {named:,} named")

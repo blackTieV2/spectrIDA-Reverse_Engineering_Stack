@@ -37,6 +37,8 @@ class Backend:
     async def write_name(self, addr, name: str, comment: str = "") -> bool: ...
     def stream_name(self, addr, insns, callees, callers) -> AsyncIterator[str]: ...
     def stream_explain(self, addr, insns, context_block: str, pseudocode: str) -> AsyncIterator[str]: ...
+    async def dyn_flags(self, addrs: list[int]) -> dict[int, str]:
+        return {}
     async def close(self) -> None: ...
 
 
@@ -78,6 +80,42 @@ class RealBackend(Backend):
         return _explain.stream_explain(
             insns, context_block=context_block, pseudocode=pseudocode)
 
+    async def dyn_flags(self, addrs):
+        """Runtime-evidence markers from the graph (if one is configured).
+
+        ▶ executed (live trace or clean fuzz) · ✖ candidate crash ·
+        ? needs_state. Any failure -> {} (markers are decoration, never
+        a reason to break the TUI)."""
+        try:
+            from spectrida.core.graph import FunctionGraph
+            from spectrida import config
+            g = FunctionGraph(config.graph_uri(), config.graph_user(),
+                              config.graph_password())
+        except Exception:
+            return {}
+        try:
+            import asyncio
+            def _query():
+                marks: dict[int, str] = {}
+                with g.driver.session() as s:
+                    rows = s.run(
+                        "MATCH (f:Function) WHERE f.addr IN $addrs "
+                        "RETURN f.addr AS addr, f.dyn_status AS st, "
+                        "f.dyn_crashes AS crashes, f.dyn_live_ran AS ran",
+                        addrs=list(addrs))
+                    for r in rows:
+                        st, crashes, ran = r["st"], r["crashes"], r["ran"]
+                        if (crashes or 0) > 0 or st == "candidate_crash":
+                            marks[r["addr"]] = "\u2716"
+                        elif ran or st == "exercised_clean":
+                            marks[r["addr"]] = "\u25b6"
+                        elif st == "needs_state":
+                            marks[r["addr"]] = "?"
+                return marks
+            return await asyncio.to_thread(_query)
+        except Exception:
+            return {}
+
     async def close(self):
         if self._ida:
             await self._ida.close()
@@ -109,6 +147,12 @@ class DemoBackend(Backend):
 
     def stream_explain(self, addr, insns, context_block, pseudocode):
         return _demo.stream_explain(addr)
+
+    async def dyn_flags(self, addrs):
+        # canned: one crashed, one traced, one needs_state — shows the column
+        return {0x1400013A0: "\u2716", 0x140001100: "\u25b6",
+                0x140001600: "?"} if any(a in addrs for a in
+                (0x1400013A0, 0x140001100, 0x140001600)) else {}
 
     async def demangle(self, names):
         return {}

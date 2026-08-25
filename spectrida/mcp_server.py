@@ -358,7 +358,8 @@ async def hunt_crashes(binary: str, address: str, seeds_dir: str = "",
 
             facts = {"status": result["verdict"], "reachable": result["reachable"],
                      "blocks": result["blocks"], "crashes": result["unique_crashes"],
-                     "seeds_used": result["seeds_used"], "tool": "atlas-hunt"}
+                     "seeds_used": result["seeds_used"], "tool": "atlas-hunt",
+                     "source": "phantomrt-alpha", "run_id": job_id}
             crash_inputs = list(result["crash_inputs"].values())
             if crash_inputs:
                 facts["crash_input"] = crash_inputs[0]
@@ -369,6 +370,17 @@ async def hunt_crashes(binary: str, address: str, seeds_dir: str = "",
             except Exception as e:
                 result["annotated"] = False
                 result["annotate_error"] = str(e)
+
+            try:
+                from pathlib import Path as _P
+
+                from spectrida.okf_bridge import write_crash_card
+                card = write_crash_card(_P.cwd(), binary=binary, addr=addr,
+                                        run_id=job_id, result=result)
+                if card:
+                    result["okf_card"] = str(card)
+            except Exception:
+                pass  # crash cards are best-effort evidence, never a failure
 
             job["result"] = result
             job["status"] = "done"
@@ -456,7 +468,9 @@ async def live_trace(binary: str, addresses: list[str], binary_path: str = "",
     observed = result.get("observed", {})
     for a in addrs:
         obs = observed.get(hex(a))
-        facts = {"live_ran": bool(obs), "tool": "atlas-live"}
+        run_id = uuid.uuid4().hex[:12]
+        facts = {"live_ran": bool(obs), "tool": "atlas-live",
+                 "source": "phantomrt-alpha", "run_id": run_id}
         if obs:
             facts["live_calls"] = obs["calls"]
             facts["live_sample_args"] = obs["sample_args"]
