@@ -207,8 +207,50 @@ extraction would rewrite the TUI (then no-go, recommend staying IDA-only).
 
 # Final Report
 
-To be appended by the build agent: commits, evidence, deviations,
-Part B recommendation summary.
+**Build completed 2026-08-25** (Part A automated criteria; live criterion
+4 pending; Part B delivered).
+
+## Commits produced
+
+| Commit | Message |
+|---|---|
+| `a5506ce` | feat(core): verified patch_bytes with write-ahead journal and revert |
+| `8818ad0` | feat(mcp): apply_patch/list_patches/revert_patch tools + api facade |
+| `5cd8e70` | docs(research): backend portability report — NO-GO for free backend today |
+
+## Evidence
+
+- Full suite: **71 passed** (63 + 8 new), `--ignore=tests/phantomrt`.
+- Safety contract proven by tests: journal-before-write (entry exists
+  before store mutation), read-back mismatch → auto-revert + raise
+  (FlakyReadIDA test), revert restores exact bytes, 0x06 decode trick
+  pins mode selection.
+- Part B: `stages/02-research/output/backend-portability-report.md`.
+
+## Deviations
+
+1. Ruff again unavailable (PyPI timeouts persisted) — py_compile + AST
+   import scan clean, same mitigation as 002a.
+2. `bits` worker command added (idaapi.inf_is_64bit) — the decode check
+   needs the database's own bitness; the PE machine-hint path only exists
+   in the format layer, not against a live .i64.
+
+## Part B recommendation summary
+
+**NO-GO on a free backend today.** D (protocol extraction) rides with
+tp-004; B (Ghidra) only if free-tier users appear — the merge rewrite is
+the honest cost; C (r2pipe) never as primary — it can't own the database
+role.
+
+## Live-acceptance table (pending — user machine)
+
+| # | Criterion | Status |
+|---|---|---|
+| 4 | Patch `add` in .i64 → re-decompile shows change → revert → original `target.exe` byte-identical | ☐ pending |
+
+## Rollback confirmation
+
+Revert the three commits; journals (`.patchlog.jsonl`) are inert data.
 
 # Rollback
 
