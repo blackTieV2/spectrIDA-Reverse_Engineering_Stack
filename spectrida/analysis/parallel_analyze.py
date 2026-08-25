@@ -30,7 +30,19 @@ from spectrida.analysis.formats import detect as detect_format
 # silently misrouting its bytes through the wrong decoder.
 _UNSUPPORTED_SCAN_ARCHES: set[str] = set()
 
-IDA_DIR   = os.environ.get("SPECTRIDA_IDALIB") or r"C:\Program Files\IDA Professional 9.1"
+def _default_ida_dir() -> str:
+    """Best-guess IDA install location when SPECTRIDA_IDALIB isn't set.
+    Windows keeps its historical default; POSIX looks in the usual spots
+    instead of handing workers a C:\\ path that can't exist."""
+    if sys.platform == "win32":
+        return r"C:\Program Files\IDA Professional 9.1"
+    for cand in ("/opt/ida-pro", "/opt/idapro", "/opt/ida",
+                 str(Path.home() / "ida-pro"), "/Applications/IDA Professional 9.1.app/Contents/MacOS"):
+        if Path(cand).exists():
+            return cand
+    return ""
+
+IDA_DIR   = os.environ.get("SPECTRIDA_IDALIB") or _default_ida_dir()
 IDAT_EXE  = str(Path(IDA_DIR) / "idat.exe")
 PYTHON    = sys.executable
 WORKER    = str(Path(__file__).parent / "shard_worker.py")
@@ -151,7 +163,8 @@ def run_shard(binary: str, shard_start: int, shard_end: int, result_path: str,
 
 MERGE_LOADER = ("""# -*- coding: utf-8 -*-
 import sys, json
-sys.path.insert(0, __import__("os").environ.get("SPECTRIDA_IDALIB") or r"C:\\Program Files\\IDA Professional 9.1")
+sys.path.insert(0, __import__("os").environ.get("SPECTRIDA_IDALIB") or
+                (r"C:\\Program Files\\IDA Professional 9.1" if sys.platform == "win32" else ""))
 sys.path.insert(0, r\"""" + str(Path(__file__).parent) + """\")
 import idapro
 idapro.enable_console_messages(False)
@@ -224,7 +237,8 @@ idaapi.auto_wait()
 print(f"[merge] auto_wait done, saving...", flush=True)
 
 import os, pathlib
-out_dir = pathlib.Path(os.environ.get("SPECTRIDA_OUTPUT_DIR") or r"C:\\Projects\\parallel_ida\\output")
+out_dir = pathlib.Path(os.environ.get("SPECTRIDA_OUTPUT_DIR")
+                       or (pathlib.Path.home() / ".spectrida" / "output"))
 try:
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"[merge] output dir: {out_dir}", flush=True)
@@ -548,7 +562,7 @@ def main():
 
     # Also clean sidecars next to the planned output .i64.
     # MERGE_LOADER writes to SPECTRIDA_OUTPUT_DIR/<stem>_parallel.i64 -- match that.
-    _out_dir = Path(os.environ.get("SPECTRIDA_OUTPUT_DIR") or r"C:\Projects\parallel_ida\output")
+    _out_dir = Path(os.environ.get("SPECTRIDA_OUTPUT_DIR") or (Path.home() / ".spectrida" / "output"))
     _out_stem = Path(binary).stem + "_parallel"
     for _ext in (".id0", ".id1", ".id2", ".nam", ".til"):
         (_out_dir / (_out_stem + _ext)).unlink(missing_ok=True)
@@ -572,7 +586,7 @@ def main():
         Path(str(binary_stem) + ext).unlink(missing_ok=True)
     # Clean up sidecar files next to the output .i64 (IDA leaves them after save;
     # their presence causes IOPEN_BADCRC on subsequent open_database calls).
-    _out_dir = Path(os.environ.get("SPECTRIDA_OUTPUT_DIR") or r"C:\Projects\parallel_ida\output")
+    _out_dir = Path(os.environ.get("SPECTRIDA_OUTPUT_DIR") or (Path.home() / ".spectrida" / "output"))
     _out_stem = Path(binary).stem + "_parallel"
     for ext in (".id0", ".id1", ".id2", ".nam", ".til"):
         (_out_dir / (_out_stem + ext)).unlink(missing_ok=True)

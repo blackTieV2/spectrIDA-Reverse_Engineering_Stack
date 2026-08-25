@@ -29,7 +29,9 @@ from pathlib import Path
 # misrouting its bytes through the wrong decoder.
 _UNSUPPORTED_SCAN_ARCHES: set[str] = set()
 
-IDA_DIR   = os.environ.get("SPECTRIDA_IDALIB") or r"C:\Program Files\IDA Professional 9.1"
+from spectrida.analysis.parallel_analyze import _default_ida_dir
+
+IDA_DIR   = os.environ.get("SPECTRIDA_IDALIB") or _default_ida_dir()
 ACCEL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, IDA_DIR)
 sys.path.insert(0, ACCEL_DIR)
