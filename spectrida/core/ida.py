@@ -65,6 +65,20 @@ for line in sys.stdin:
             emit({"ok": True, "result": bool(ok)})
         elif cmd == "save":
             idc.save_database(""); emit({"ok": True, "result": True})
+        elif cmd == "get_bytes":
+            addr = _norm(a["address"]); size = int(a["size"])
+            data = idc.get_bytes(addr, size)
+            emit({"ok": True, "result": data.hex() if data else None})
+        elif cmd == "bits":
+            # INF_64BIT: is the database 64-bit? drives the Capstone decode
+            # mode for patch verification (32-bit PEs must not decode as 64).
+            emit({"ok": True, "result": "64" if idaapi.inf_is_64bit() else "32"})
+        elif cmd == "patch":
+            addr = _norm(a["address"]); data = bytes.fromhex(a["hex"])
+            import ida_bytes
+            ok = ida_bytes.patch_bytes(addr, data)
+            idc.save_database("")
+            emit({"ok": True, "result": bool(ok)})
         elif cmd == "xrefs_to":   # callers of this function
             addr = _norm(a["address"]); seen = {};
             for xr in idautils.XrefsTo(addr):
@@ -356,6 +370,74 @@ async def rename(ida: IDAHandle, address: str | int, new_name: str) -> bool:
         return bool(ok)
     except Exception:
         return False
+
+async def get_bytes(ida: IDAHandle, address: str | int, size: int) -> bytes | None:
+    hx = await ida.call("get_bytes", address=_hex(address), size=size)
+    return bytes.fromhex(hx) if hx else None
+
+
+async def bits(ida: IDAHandle) -> str:
+    return await ida.call("bits")
+
+
+async def patch_bytes(ida: IDAHandle, address: str | int, data: bytes) -> bool:
+    ok = await ida.call("patch", address=_hex(address), hex=data.hex())
+    return bool(ok)
+
+
+async def verified_patch(ida: IDAHandle, address: str | int, data: bytes) -> dict:
+    """Journal-before-write → patch → read-back verify → decode check.
+
+    On read-back mismatch: auto-revert from the journal and raise.
+    Returns the journal entry + verification + decoded instruction list.
+    Patches live in the .i64 ONLY — the source binary is never touched.
+    """
+    from spectrida.core import patchlog
+
+    addr = int(address, 16) if isinstance(address, str) else address
+    mode = await bits(ida)
+    old_bytes = await get_bytes(ida, addr, len(data))
+    if old_bytes is None:
+        raise ValueError(f"cannot read {len(data)} bytes at {hex(addr)} — not mapped?")
+
+    entry = patchlog.append_entry(ida.i64, addr=addr, old_bytes=old_bytes,
+                                  new_bytes=data, mode=mode)
+    ok = await patch_bytes(ida, addr, data)
+    if not ok:
+        raise RuntimeError(f"idalib refused patch at {hex(addr)}")
+
+    readback = await get_bytes(ida, addr, len(data))
+    verified = readback == data
+    if not verified:
+        # auto-revert: the journal has the original bytes
+        await patch_bytes(ida, addr, old_bytes)
+        patchlog.mark_reverted(ida.i64, entry["id"])
+        raise RuntimeError(
+            f"read-back mismatch at {hex(addr)} — auto-reverted from journal "
+            f"(entry {entry['id']})")
+
+    check = patchlog.decode_check(data, mode, addr)
+    return {"entry": entry, "verified": True, **check}
+
+
+async def revert_patch(ida: IDAHandle, patch_id: str) -> dict:
+    """Restore the original bytes recorded in a journal entry."""
+    from spectrida.core import patchlog
+
+    entry = patchlog.find_entry(ida.i64, patch_id)
+    if entry is None:
+        raise ValueError(f"no patch entry {patch_id!r} in journal")
+    if entry.get("reverted"):
+        return {"id": patch_id, "reverted": True, "note": "already reverted"}
+    ok = await patch_bytes(ida, entry["addr"], bytes.fromhex(entry["old_bytes"]))
+    if not ok:
+        raise RuntimeError(f"idalib refused revert of {patch_id}")
+    readback = await get_bytes(ida, entry["addr"], len(entry["old_bytes"]) // 2)
+    if readback != bytes.fromhex(entry["old_bytes"]):
+        raise RuntimeError(f"revert read-back mismatch for {patch_id}")
+    patchlog.mark_reverted(ida.i64, patch_id)
+    return {"id": patch_id, "reverted": True, "addr": entry["addr_hex"]}
+
 
 async def xrefs_to(ida: IDAHandle, address: str | int) -> list[dict]:
     try:
