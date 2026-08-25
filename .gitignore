@@ -25,3 +25,14 @@ output/
 
 # env / secrets
 .env
+
+# Node (no JS source ships in this repo; never commit dependency trees)
+node_modules/
+desktop/
+
+# Persistent-workspace runtime state (derived, rebuildable — never canonical)
+.runtime/
+
+# OS noise
+Thumbs.db
+.DS_Store
