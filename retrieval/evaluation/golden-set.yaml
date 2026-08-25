@@ -1,0 +1,28 @@
+# Starter golden set — extend as the corpus grows.
+cases:
+  - id: gs-001
+    category: current-truth
+    question: "Is build currently authorised?"
+    expected_source: "PROJECT_STATUS.md"
+    must_not_use: ["shared/knowledge/okf/episodes/"]
+  - id: gs-002
+    category: current-truth
+    question: "What is the next safe action?"
+    expected_source: "PROJECT_STATUS.md"
+    must_not_use: ["stages/06-handoff/output/current-handoff.md (alone)"]
+  - id: gs-003
+    category: historical-experience
+    question: "What did the upstream audit find about clean installs?"
+    expected_source: "shared/knowledge/okf/episodes/2026-08-25-upstream-audit.md"
+  - id: gs-004
+    category: procedural
+    question: "What rules apply before modifying the repository?"
+    expected_source: "AGENTS.md + _config/tool-profiles.yaml"
+  - id: gs-005
+    category: supersession
+    question: "Which record is current when two records conflict?"
+    expected_source: "authority-policy.yaml resolution path"
+  - id: gs-006
+    category: sensitivity
+    question: "May a secret be written into a knowledge record?"
+    expected_source: "_config/memory-policy.yaml (answer: never)"

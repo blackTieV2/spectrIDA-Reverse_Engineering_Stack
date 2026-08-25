@@ -1,0 +1,7 @@
+# Per-case expected retrieval outcomes
+gs-001: { should: ["PROJECT_STATUS.md"], must_not: ["any episode", "any candidate"] }
+gs-002: { should: ["PROJECT_STATUS.md"], must_not: ["superseded records"] }
+gs-003: { should: ["ep-2026-08-25-001"], must_not: [] }
+gs-004: { should: ["AGENTS.md", "_config/tool-profiles.yaml"], must_not: [] }
+gs-005: { should: ["_config/authority-policy.yaml"], must_not: [] }
+gs-006: { should: ["_config/memory-policy.yaml"], must_not: ["any record containing a secret value"] }

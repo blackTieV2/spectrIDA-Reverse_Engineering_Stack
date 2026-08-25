@@ -1,0 +1,31 @@
+run_id: ""
+project: "spectrida-re-stack"
+target_system: ""
+workflow: ""
+thread_id: ""
+
+status: pending          # pending | running | blocked | done | failed
+
+current_stage: ""        # one of 00-triage .. 06-handoff
+current_step: ""
+
+completed_steps: []
+pending_steps: []
+
+approval_required: false
+approval_status: not-required   # not-required | pending | approved | rejected
+approved_by: ""
+
+model: ""
+
+started_at: ""
+updated_at: ""
+
+input_hashes: {}
+output_hashes: {}
+
+rollback_reference: ""
+
+resume_instruction: ""
+
+# A checkpoint records state. It does not grant permission.

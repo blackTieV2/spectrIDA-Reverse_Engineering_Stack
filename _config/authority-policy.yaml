@@ -1,0 +1,43 @@
+# Authority policy — spectrida-re-stack
+# Governing rule: Recall may suggest. Authority decides. Live state verifies.
+version: "1.0"
+
+authority_order:  # highest first
+  - level: 1
+    source: "Explicit current user instruction"
+    notes: "The user, in the current session, for the current task."
+  - level: 2
+    source: "Verified live target state from the current run"
+    notes: "git rev-parse HEAD, service health, actual file bytes — measured now."
+  - level: 3
+    source: "PROJECT_STATUS.md (current profile)"
+    notes: "Concise latest consolidated state. Not a log."
+  - level: 4
+    source: "Canonical instructions: AGENTS.md, CONTEXT.md, stage contracts"
+  - level: 5
+    source: "Approved design/architecture/decision records (shared/knowledge/okf/decisions)"
+  - level: 6
+    source: "Current approved durable knowledge (OKF)"
+  - level: 7
+    source: "Current approved handoff (stages/06-handoff/output/current-handoff.md)"
+  - level: 8
+    source: "Historical episodic records and previous run evidence"
+  - level: 9
+    source: "Previous prompts, conversations, summaries, superseded handoffs"
+  - level: 10
+    source: "Semantic/vector/associative retrieval results"
+    notes: "Suggestions only. Never decisive."
+
+conflict_procedure:
+  - "Do not silently reconcile."
+  - "Identify the conflict; record both sources and their levels."
+  - "Prefer the higher-authority source."
+  - "Mutable operational facts require live verification regardless of level."
+  - "Escalate to the user when the conflict affects consequential action."
+
+execution_hold:
+  field: "PROJECT_STATUS.md frontmatter: execution_hold"
+  while_active:
+    - "No build, merge, push, deploy, delete, or external side effects."
+    - "Read-only recon and drafting remain permitted."
+  lifted_by: "explicit user instruction only"

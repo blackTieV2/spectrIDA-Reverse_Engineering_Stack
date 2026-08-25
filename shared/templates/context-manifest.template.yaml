@@ -1,0 +1,29 @@
+run_id: ""
+generated_at: ""
+
+project: "spectrida-re-stack"
+stage: ""
+task: ""
+
+included_sources: []
+#  - path: ""
+#    hash: ""
+#    authority: ""       # level 1-10 per _config/authority-policy.yaml
+#    status: ""
+#    reason_for_inclusion: ""
+
+failure_patterns_checked: []
+
+tool_profile: ""
+
+excluded_context:
+  - superseded-plans
+  - unrelated-history
+  - raw-conversation
+  - irrelevant-tools
+
+live_target: {}
+
+retrieval: {}
+
+gates: {}                # e.g. target_gate: PASS|FAIL, execution_hold: true|false

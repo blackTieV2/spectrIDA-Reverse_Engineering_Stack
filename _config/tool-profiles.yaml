@@ -1,0 +1,18 @@
+# Tool profiles — what each stage's agent may touch
+version: "1.0"
+
+triage:      { read: true,  write: false, execute: false, note: "classify only" }
+intake:      { read: true,  write: "stage output only", execute: false }
+research:    { read: true,  write: "evidence into stage output", execute: "read-only recon" }
+design:      { read: "approved inputs", write: "design docs into stage output", execute: false }
+build:
+  read: true
+  write: "approved scope only"
+  execute: "explicitly approved validation only"
+  forbidden_without_explicit_approval: [merge, push, deploy, reset, clean, restore, stash, rebase, "broad dependency change"]
+qa:          { read: true, write: "qa reports", execute: "validation suites", note: "do not silently repair" }
+handoff:     { read: true, write: "status + records", execute: false, note: "no implementation" }
+
+small_local_models:
+  may: [inventory, recon, search, classification, summarisation, bounded-drafting]
+  must_not_approve: [destructive-changes, security-decisions, architecture, production-deploy, release, privacy-sensitive-actions, execution-hold-exceptions]

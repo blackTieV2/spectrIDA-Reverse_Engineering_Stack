@@ -1,0 +1,19 @@
+# Shape of a durable knowledge/episodic record (frontmatter)
+type: object
+required: [id, type, title, status, authority, project, created_at]
+properties:
+  id:            { type: string }
+  type:          { enum: [concept, schema, policy, architecture, lesson, episode, decision, playbook] }
+  title:         { type: string }
+  status:        { enum: [draft, candidate, approved, superseded, retired] }
+  authority:     { enum: [canonical, current-profile, approved, supporting, historical, candidate, transient] }
+  canonical:     { type: boolean }
+  sensitivity:   { enum: [public, internal, confidential, restricted, secret-reference-only] }
+  project:       { type: string }
+  domain:        { type: string }
+  tags:          { type: array, items: { type: string } }
+  source:        { type: object }
+  created_at:    { type: string }
+  updated_at:    { type: string }
+  last_verified: { type: string }
+  relationships: { type: array }

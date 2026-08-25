@@ -1,0 +1,35 @@
+# Retrieval policy — spectrida-re-stack
+version: "1.0"
+
+prime_directive: "Recall helps agents FIND things. It never decides what is true."
+
+derived_stores:
+  location: .runtime/recall/
+  properties: [derived, disposable, rebuildable, non-authoritative]
+  git: "excluded via .gitignore"
+
+tiers_in_order:
+  - 1: "Deterministic routing — known paths, current profile"
+  - 2: "Exact search — filenames, ids, dates, hashes, versions"
+  - 3: "Full-text search — keyword/BM25-style"
+  - 4: "Metadata/relationship filtering — project, stage, authority, status, freshness"
+  - 5: "Recency — a ranking benefit only; never overrides authority"
+  - 6: "Semantic embeddings — only after tiers 1-5 exist and benchmarks show value"
+  - 7: "Graph/relationship expansion — supersedes/contradicts/supports/derived-from"
+
+pre_packet_checks:  # every recalled item, before it enters a task packet
+  - authority
+  - status
+  - supersession
+  - contradiction
+  - sensitivity
+  - project relevance
+  - freshness
+  - "classify as: current fact | approved procedure | historical experience | candidate inference"
+
+dangerous_authority_error_rate:
+  definition: "A historical/supporting/candidate/semantic memory causes an incorrect CURRENT operational instruction."
+  target: 0
+  note: "This metric outranks maximum semantic recall."
+
+feedback: "Collect retrieval-feedback.yaml records; do NOT retune weights until evidence exists."

@@ -1,0 +1,17 @@
+# One retrieval event, for the feedback loop
+type: object
+required: [run_id, query_id, record_id, retrieved]
+properties:
+  run_id:   { type: string }
+  query_id: { type: string }
+  record_id:{ type: string }
+  retrieved:{ type: boolean }
+  included_in_packet: { type: boolean }
+  used_by_agent:      { type: boolean }
+  ignored:            { type: boolean }
+  corrected:          { type: boolean }
+  caused_requery:     { type: boolean }
+  authority_conflict: { type: boolean }
+  reason:
+    type: array
+    items: { enum: [relevant, irrelevant, duplicate, stale, superseded, contradicted, too-low-authority, sensitivity-blocked, useful-historical-example, current-authoritative-source] }

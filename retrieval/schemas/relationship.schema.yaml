@@ -1,0 +1,6 @@
+# Relationship edge between memory records
+type: object
+required: [type, target]
+properties:
+  type:   { enum: [supersedes, superseded-by, contradicts, contradicted-by, supports, derived-from, related-to] }
+  target: { type: string, description: "record id" }

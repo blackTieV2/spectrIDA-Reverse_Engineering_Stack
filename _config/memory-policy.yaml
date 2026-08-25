@@ -1,0 +1,49 @@
+# Memory policy — spectrida-re-stack
+version: "1.0"
+
+# Five separated classes. Never collapse them into one folder.
+classes:
+  current_state_profile:
+    location: PROJECT_STATUS.md
+    purpose: "Latest consolidated truth. Concise. Not a log."
+    automatic_write: limited
+    human_review: "consequential changes reviewed"
+  semantic:
+    location: shared/knowledge/okf
+    purpose: "Durable facts, concepts, architecture, validated knowledge."
+    automatic_write: proposal-only
+    human_review: required
+    frontmatter_required: true
+  episodic:
+    location: shared/knowledge/okf/episodes
+    purpose: "What happened. High-signal events only — never chatter."
+    automatic_write: draft-allowed
+    human_review: "before durable promotion"
+  procedural:
+    location: "AGENTS.md, CONTEXT.md, stages/*/CONTEXT.md, playbooks, _config/"
+    purpose: "How agents and humans should behave."
+    automatic_write: proposal-only
+    human_review: required
+  runtime:
+    location: runs/<run-id>/
+    purpose: "Active-workflow checkpointing so an interrupted run can resume."
+    automatic_write: yes
+    human_review: no
+    durable_truth: false
+
+promotion:
+  rule: "DETECT -> PROPOSE -> HUMAN REVIEW -> PROMOTE. Never auto-promote."
+  candidates_location: retrieval/consolidation/candidates
+  candidate_frontmatter:
+    status: candidate
+    authority: candidate
+    canonical: false
+
+supersession:
+  rule: "Preserve history. Mark old records superseded via relationships; do not delete."
+  relationship_types: [supersedes, superseded-by, contradicts, contradicted-by, supports, derived-from]
+
+sensitivity:
+  levels: [public, internal, confidential, restricted, secret-reference-only]
+  secrets_rule: "Secrets are NEVER stored in markdown, YAML, task packets, indexes, logs, or prompts. Reference an external secrets system by name only."
+  indexes: "A retrieval index enforces the same sensitivity level as its source."

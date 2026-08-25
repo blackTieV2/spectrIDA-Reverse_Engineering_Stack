@@ -1,0 +1,16 @@
+run_id: ""
+query_id: ""
+record_id: ""
+
+retrieved: true
+included_in_packet: false
+used_by_agent: false
+ignored: false
+corrected: false
+caused_requery: false
+authority_conflict: false
+
+reason: []
+# allowed: relevant | irrelevant | duplicate | stale | superseded | contradicted
+#          too-low-authority | sensitivity-blocked | useful-historical-example
+#          current-authoritative-source

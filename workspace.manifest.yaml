@@ -1,0 +1,39 @@
+workspace:
+  name: "spectrIDA (blackTieV2 fork)"
+  slug: "spectrida-re-stack"
+  specification:
+    name: model-neutral-persistent-agent-workspace
+    version: "1.0"
+    installed_at: "2026-08-25"
+    last_audited: "2026-08-25"
+
+  canonical_files:
+    agent_entrypoint: AGENTS.md
+    router: CONTEXT.md
+    status: PROJECT_STATUS.md
+
+  memory:
+    current_profile: PROJECT_STATUS.md
+    durable_root: shared/knowledge/okf
+    episodic_root: shared/knowledge/okf/episodes
+    runtime_root: runs
+    derived_recall_root: .runtime/recall
+
+  stages:
+    - 00-triage
+    - 01-intake
+    - 02-research
+    - 03-design
+    - 04-build
+    - 05-qa
+    - 06-handoff
+
+  model_specific_files_are_adapters_only: true
+  vector_index_is_authoritative: false
+
+  target_repository: "https://github.com/blackTieV2/spectrIDA-Reverse_Engineering_Stack"
+  upstream_repository: "https://github.com/ggfuchsi-oss/spectrIDA-Reverse_Engineering_Stack"
+  default_workspace_location: "%USERPROFILE%\\Documents\\GitHub\\spectrIDA-Reverse_Engineering_Stack"
+  unresolved:
+    - timezone
+    - target_head (verify live)
