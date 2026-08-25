@@ -686,6 +686,57 @@ async def get_context(binary: str, address: str, depth: int = 2,
 
 
 @mcp.tool()
+async def explain_function(binary: str, address: str, depth: int = 2,
+                           max_neighbors: int = 10,
+                           include_pseudocode: bool = True) -> dict:
+    """Explain one function in natural language (structured, parseable output).
+
+    Gathers N-hop call-graph context (callers/callees/strings/constants),
+    disassembly, and optionally pseudocode, then asks the local model for a
+    structured explanation: PURPOSE / BEHAVIOR / INPUTS / OUTPUTS /
+    SIDE_EFFECTS / SUGGESTED_NAME / CONFIDENCE. The parser is tolerant - a
+    model that ignores the contract still yields displayable text.
+
+    Requires Ollama running with the naming model. Read-only: writes nothing.
+    """
+    import time
+
+    from spectrida.context import format_context_block, gather_context
+    from spectrida.core.explain import explain as _explain
+
+    addr = _norm_addr(address)
+    t0 = time.monotonic()
+
+    db = await _live_db(binary)
+    insns = await db.disasm(addr)
+    pseudocode = ""
+    if include_pseudocode:
+        try:
+            pseudocode = await db.decompile(addr)
+        except Exception:
+            fn = _g().get_function(binary, addr)
+            if fn:
+                pseudocode = fn.get("pseudocode", "")
+
+    ctx = gather_context(_g(), binary, addr,
+                         depth=depth, max_neighbors=max_neighbors,
+                         pseudocode=pseudocode or "")
+    context_block = format_context_block(ctx)
+
+    expl = await _explain(insns, context_block=context_block,
+                          pseudocode=pseudocode)
+    return {
+        "address": hex(addr),
+        "explanation": expl.to_dict(),
+        "context": {"strings": len(ctx.strings),
+                    "callers": len(ctx.callers),
+                    "callees": len(ctx.callees)},
+        "model": config.ollama_model(),
+        "elapsed_ms": int((time.monotonic() - t0) * 1000),
+    }
+
+
+@mcp.tool()
 async def baseline_naming(binary: str, sample_size: int = 100) -> dict:
     """Phase 0: measure current naming accuracy on a sample of functions.
 
