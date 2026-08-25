@@ -14,6 +14,26 @@ walls. It walks through them: emulates, hooks, and fuzzes the functions it named
 
 </div>
 
+> **🔱 This is the blackTieV2 fork.** Divergence from upstream
+> ([ggfuchsi-oss/spectrIDA-Reverse_Engineering_Stack](https://github.com/ggfuchsi-oss/spectrIDA-Reverse_Engineering_Stack)):
+>
+> - **fix:** clean `pip install spectrida` actually works — lz4/capstone/numpy
+>   are declared base dependencies (upstream crashed or silently found zero
+>   functions without them)
+> - **fix:** torch is genuinely optional — CPU-only installs no longer
+>   silently return zero functions
+> - **fix:** 32-bit x86 PEs decode via Capstone `CS_MODE_32` (upstream fed
+>   them to the 64-bit decoder); arch hint comes from the COFF machine field
+> - **fix:** platform-aware IDA/output path defaults (upstream hardcoded the
+>   author's `C:\` paths)
+> - **chore:** 7.3 MB of committed `desktop/node_modules` (no source) removed
+> - **feat:** a model-neutral persistent agent workspace is bootstrapped at
+>   the repo root (`AGENTS.md` → `PROJECT_STATUS.md` → `CONTEXT.md`); spec in
+>   [docs/PERSISTENT-MEMORY-BOOTSTRAP-SPEC.md](docs/PERSISTENT-MEMORY-BOOTSTRAP-SPEC.md),
+>   quickstart in [docs/QUICKSTART-WINDOWS-PE.md](docs/QUICKSTART-WINDOWS-PE.md)
+>
+> Everything below is the upstream README, corrected where it was inaccurate.
+
 ```
 spectrida analyze GameAssembly.dll --workers 16
 ```
@@ -115,10 +135,11 @@ That got reverted fast. Kept the much smaller, much safer FLIRT-signature skip i
 worth a shrug-worthy ~3% and didn't break anything, which by this point felt like a personality
 trait worth keeping.)
 
-**On naming accuracy:** it's not Ghidra-grade ground truth, it's an 8B model guessing from
-pseudocode. Generic helpers/getters tend to land well; deeply game-specific logic is more of a
-coin flip. Rename anything it gets wrong — that's why `rename_function` persists straight back
-into the graph.
+**On naming accuracy:** it's not Ghidra-grade ground truth, it's an 8B model
+guessing from disassembly plus call-chain context (callers/callees). Generic
+helpers/getters tend to land well; deeply game-specific logic is more of a
+coin flip. Rename anything it gets wrong — that's why `rename_function` persists
+straight back into the graph.
 
 ---
 
@@ -157,8 +178,16 @@ into the graph.
 ## Install
 
 ```bash
-pip install spectrida
+pip install spectrida            # base: pipeline + TUI + scanners
+pip install "spectrida[gpu]"     # + torch (GPU prologue scanning)
+pip install "spectrida[graph]"   # + Neo4j/MCP (Chapter 2)
+pip install "spectrida[atlas]"   # + phantomrt dynamic layer (Chapter 3, heavy)
 ```
+
+> **This fork:** before your first real run, read
+> [docs/QUICKSTART-WINDOWS-PE.md](docs/QUICKSTART-WINDOWS-PE.md) — its Step 0
+> sets up the persistent project workspace (`AGENTS.md`, `PROJECT_STATUS.md`,
+> memory layers) that this repo carries at its root.
 
 Requirements: **IDA Pro 9.x** with idalib · **Python 3.10+** · **Ollama**
 
