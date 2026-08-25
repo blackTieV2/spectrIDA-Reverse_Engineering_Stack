@@ -32,18 +32,20 @@ def _build_prompt(insns: list[dict], callees: list[str], callers: list[str]) -> 
     )
 
 
-async def stream_name(
-    insns: list[dict],
-    callees: list[str],
-    callers: list[str],
+async def stream_generate(
+    system: str,
+    prompt: str,
+    *,
+    num_predict: int = 256,
+    temperature: float = 0.2,
 ) -> AsyncIterator[str]:
-    """Yield response tokens one at a time as the model writes the name + reason."""
+    """Yield response tokens one at a time from the Ollama generate endpoint."""
     payload = {
         "model": ollama_model(),
-        "system": _SYSTEM,
-        "prompt": _build_prompt(insns, callees, callers),
+        "system": system,
+        "prompt": prompt,
         "stream": True,
-        "options": {"temperature": 0.2, "num_predict": 256},
+        "options": {"temperature": temperature, "num_predict": num_predict},
     }
     async with httpx.AsyncClient(timeout=120) as client:
         async with client.stream("POST", f"{ollama_url()}/api/generate", json=payload) as resp:
@@ -60,6 +62,18 @@ async def stream_name(
                     yield chunk["response"]
                 if chunk.get("done"):
                     break
+
+
+async def stream_name(
+    insns: list[dict],
+    callees: list[str],
+    callers: list[str],
+) -> AsyncIterator[str]:
+    """Yield response tokens one at a time as the model writes the name + reason."""
+    async for tok in stream_generate(
+        _SYSTEM, _build_prompt(insns, callees, callers), num_predict=256
+    ):
+        yield tok
 
 
 async def name_function(insns: list[dict], callees: list[str], callers: list[str]) -> str:
