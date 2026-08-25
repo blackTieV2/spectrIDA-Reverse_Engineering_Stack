@@ -26,6 +26,7 @@ class BrowserScreen(Screen):
         Binding("n", "name_func", "Name"),
         Binding("r", "rename_func", "Rename"),
         Binding("d", "decompile_func", "Decompile"),
+        Binding("e", "explain_func", "Explain"),
         Binding("c", "chain_func", "Chain"),
         Binding("b", "batch_name", "Batch"),
         Binding("o", "overview", "Overview"),
@@ -159,6 +160,65 @@ class BrowserScreen(Screen):
         pane.write(Text("  callees (what this calls):", Style(color="#8b5cf6", bold=True)))
         for c in callees or [{"name": "  (none)"}]:
             pane.write(Text(f"    → {c.get('name') or c.get('address','')}", Style(color="#00d4ff")))
+
+    # ── AI explain ──
+    def action_explain_func(self) -> None:
+        if not self._cur:
+            self.notify("select a function first", severity="warning")
+            return
+        if self._busy:
+            self.notify("still working — wait a moment", severity="warning")
+            return
+        self._busy = True
+        self._spawn(self._stream_explain())
+
+    async def _stream_explain(self) -> None:
+        from spectrida.core.explain import (
+            build_context_block,
+            extract_strings_from_insns,
+            parse_explanation,
+        )
+        try:
+            pane = self.query_one(DisasmPane)
+            self.query_one("#disasm-header", Static).update(
+                f"  EXPLANATION  ▸  [b]{self._cur['name']}[/]  "
+                "[dim](streaming · D to return to disasm)[/]")
+            pane.clear()
+            addr = self._cur["start"]
+            strings = extract_strings_from_insns(self._insns)
+            context_block = build_context_block(self._callers, self._callees, strings)
+            try:
+                pseudocode = await self._b.decompile(addr)
+            except Exception:
+                pseudocode = ""
+
+            full = ""
+            buf = ""
+            async for tok in self._b.stream_explain(addr, self._insns, context_block, pseudocode):
+                full += tok
+                buf += tok
+                while "\n" in buf:
+                    line, buf = buf.split("\n", 1)
+                    pane.write("  " + line)
+            if buf.strip():
+                pane.write("  " + buf)
+
+            expl = parse_explanation(full)
+            pane.write("")
+            pane.write(Text(f"  ▸ confidence: {expl.confidence}"
+                            + (f" — {expl.confidence_why}" if expl.confidence_why else ""),
+                            Style(color="#8b5cf6", bold=True)))
+            if expl.suggested_name:
+                self._suggested = expl.suggested_name
+                pane.write(Text(f"  ▸ suggested name: {expl.suggested_name}  (press R to rename)",
+                                Style(color="#fbbf24")))
+        except Exception as e:
+            try:
+                self.notify(str(e), severity="error")
+            except Exception:
+                pass
+        finally:
+            self._busy = False
 
     # ── AI naming ──
     def action_name_func(self) -> None:

@@ -109,3 +109,28 @@ async def stream_name(addr):
     for chunk in text.split(" "):
         await asyncio.sleep(0.03)
         yield chunk + " "
+
+
+_DEMO_EXPLANATIONS: dict[int, str] = {}  # addr -> canned explanation text
+
+_DEFAULT_EXPLANATION = (
+    "PURPOSE: Updates an internal float field against a threshold.\n"
+    "BEHAVIOR:\n"
+    "1. Loads a float from [rcx+0x40].\n"
+    "2. Subtracts a value pointed to by rdx.\n"
+    "3. Stores the result back and compares against a global constant.\n"
+    "INPUTS: this in rcx, delta pointer in rdx\n"
+    "OUTPUTS: none evident (field mutated in place)\n"
+    "SIDE_EFFECTS: writes [rcx+0x40]\n"
+    "SUGGESTED_NAME: apply_meter_delta\n"
+    "CONFIDENCE: medium - field purpose inferred from arithmetic pattern only "
+    "(demo mode - no real model running.)"
+)
+
+
+async def stream_explain(addr):
+    """Fake token-by-token explanation for the demo pane (no model needed)."""
+    text = _DEMO_EXPLANATIONS.get(_norm(addr), _DEFAULT_EXPLANATION)
+    for chunk in text.split(" "):
+        await asyncio.sleep(0.03)
+        yield chunk + " "

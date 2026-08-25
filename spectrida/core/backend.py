@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from spectrida.core import demo as _demo
+from spectrida.core import explain as _explain
 from spectrida.core import ida as _ida
 from spectrida.core import ollama as _ollama
 
@@ -35,6 +36,7 @@ class Backend:
     async def knowledge(self, addrs: list[str]) -> list[dict]: ...
     async def write_name(self, addr, name: str, comment: str = "") -> bool: ...
     def stream_name(self, addr, insns, callees, callers) -> AsyncIterator[str]: ...
+    def stream_explain(self, addr, insns, context_block: str, pseudocode: str) -> AsyncIterator[str]: ...
     async def close(self) -> None: ...
 
 
@@ -72,6 +74,10 @@ class RealBackend(Backend):
     def stream_name(self, addr, insns, callees, callers):
         return _ollama.stream_name(insns, callees, callers)
 
+    def stream_explain(self, addr, insns, context_block, pseudocode):
+        return _explain.stream_explain(
+            insns, context_block=context_block, pseudocode=pseudocode)
+
     async def close(self):
         if self._ida:
             await self._ida.close()
@@ -100,6 +106,9 @@ class DemoBackend(Backend):
 
     def stream_name(self, addr, insns, callees, callers):
         return _demo.stream_name(addr)
+
+    def stream_explain(self, addr, insns, context_block, pseudocode):
+        return _demo.stream_explain(addr)
 
     async def demangle(self, names):
         return {}

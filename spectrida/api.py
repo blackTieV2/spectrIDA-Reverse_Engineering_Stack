@@ -14,7 +14,6 @@ without launching the TUI.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import random
 from collections.abc import AsyncIterator
@@ -23,8 +22,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from spectrida.core.backend import DemoBackend, RealBackend
-from spectrida.core.ollama import extract_name, name_function, stream_name
-
+from spectrida.core.ollama import extract_name
 
 # ── public types ────────────────────────────────────────────────────────────
 
@@ -179,6 +177,38 @@ class IDADatabase:
     ) -> AsyncIterator[str]:
         """Raw token stream for custom UIs."""
         return self._b.stream_name(address, insns, callees, callers)
+
+    async def stream_explain(
+        self,
+        address: int | str,
+        *,
+        include_pseudocode: bool = True,
+    ) -> AsyncIterator[str]:
+        """Stream a structured natural-language explanation of one function.
+
+        Gathers disassembly, callers/callees, referenced strings, and
+        (optionally) pseudocode, then streams the model's
+        PURPOSE/BEHAVIOR/INPUTS/OUTPUTS/SIDE_EFFECTS/SUGGESTED_NAME/CONFIDENCE
+        answer token by token. Read-only. Requires Ollama for real backends;
+        the demo backend serves a canned stream.
+        """
+        from spectrida.core.explain import build_context_block, extract_strings_from_insns
+
+        a = address if isinstance(address, int) else int(address, 16)
+        insns = await self.disasm(a)
+        callees = [x.get("name") or x["address"] for x in await self.xrefs_from(a)]
+        callers = [x.get("name") or x["address"] for x in await self.xrefs_to(a)]
+        strings = extract_strings_from_insns(insns)
+        context_block = build_context_block(callers, callees, strings)
+        pseudocode = ""
+        if include_pseudocode:
+            try:
+                pseudocode = await self.decompile(a)
+            except Exception:
+                pseudocode = ""  # Hex-Rays unavailable for this arch/db — degrade
+
+        async for tok in self._b.stream_explain(a, insns, context_block, pseudocode):
+            yield tok
 
     async def batch_name(
         self,
