@@ -8,12 +8,25 @@ Central toggles — edit here or override via environment variables.
 """
 import os
 
-import torch
+# torch is an OPTIONAL dependency (the [gpu] extra). The CPU/numpy scanner
+# paths and the Capstone recursive-descent pass must work without it -- an
+# unguarded top-level `import torch` here used to take down the entire
+# ida_gpu_accel package on a base install, which shard_worker.py then
+# swallowed as a "non-fatal" scan error and produced ZERO functions. Never
+# import torch at module scope in this package; the GPU scan functions
+# import it lazily and are only reachable when GPU_ENABLED.
+try:
+    import torch
+    _HAS_TORCH = True
+except ImportError:
+    torch = None  # type: ignore
+    _HAS_TORCH = False
 
 # ── GPU ─────────���─────────────────────────────────────────────────────────────
 # Scanning phases (prologues, BL targets, basic block boundaries, strings)
 GPU_ENABLED: bool = (
-    os.environ.get("IDA_GPU", "1") != "0"
+    _HAS_TORCH
+    and os.environ.get("IDA_GPU", "1") != "0"
     and torch.cuda.is_available()
 )
 
