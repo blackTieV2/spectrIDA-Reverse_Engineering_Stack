@@ -199,8 +199,45 @@ any phantomrt call signature differs from what `live.py` currently assumes.
 
 # Final Report
 
-To be appended by the build agent: commits, evidence, deviations,
-rollback confirmation.
+**002a build completed 2026-08-25** (automated criteria; live criteria
+pending on the user's machine).
+
+## Commits produced
+
+| Commit | Message |
+|---|---|
+| `3cbe4fe` | docs(design): revise tp-002 to 002a — annotation leg already exists upstream |
+| `5d3eeb2` | feat(dynamic): provenance fields, OKF crash cards, TUI dyn markers |
+
+## Evidence
+
+- Full suite: **63 passed** (55 + 8 new), `--ignore=tests/phantomrt`.
+- Ruff: **not run** — PyPI unreachable from the sandbox at build time
+  (repeated read timeouts). Mitigation: py_compile clean + AST unused-import
+  scan clean. Deviation recorded; user-side lint welcome.
+
+## Deviations from 002a scope
+
+1. Base `Backend.dyn_flags` returns `{}` instead of `...` (caught by tests —
+   `...` would have returned None to callers iterating the dict).
+2. Crash cards live under `shared/knowledge/okf/playbooks/crash-patterns/`
+   with `status: draft` — doctrine (draft-only agent-authored memory).
+3. OKF card root resolves to the process CWD — the MCP server runs from the
+   repo, so cards land in the workspace. Documented in the module docstring.
+
+## Live-acceptance table (pending — user machine)
+
+| # | Criterion | Status |
+|---|---|---|
+| 4 | Frida-trace `target.exe` `main` → `factorial` shows `▶` | ☐ pending |
+| 5 | Crash verdict → draft card in crash-patterns/ | ☐ pending |
+| — | `--demo` shows marker column (canned ✖/▶/?) | ☐ pending |
+
+## Rollback confirmation
+
+Revert `5d3eeb2` (+`3cbe4fe` for the design note). Graph properties are
+additive; purge with `MATCH (f:Function) REMOVE f.dyn_source, f.dyn_run_id`
+if ever unwanted. Cards are inert draft files.
 
 # Rollback
 
