@@ -126,14 +126,19 @@ def _disasm_x86_func(md, data: bytes, base_ea: int, entry: int,
 
 def _scan_shard_x86(data: bytes, base_ea: int,
                     shard_start: int, shard_end: int,
-                    entry_points: list[int]) -> ShardResult:
-    """Full Capstone x86_64 disasm pass on one shard."""
+                    entry_points: list[int], mode32: bool = False) -> ShardResult:
+    """Full Capstone x86/x86_64 disasm pass on one shard.
+
+    mode32 selects CS_MODE_32 for 32-bit PEs — feeding 32-bit code to the
+    64-bit decoder silently produces garbage functions (wrong operand widths,
+    REX prefixes reinterpreted as inc/dec), which is worse than no scan."""
     t0 = time.perf_counter()
 
     if not HAS_CAPSTONE:
         raise ImportError("capstone not installed — run: pip install capstone")
 
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    md = capstone.Cs(capstone.CS_ARCH_X86,
+                     capstone.CS_MODE_32 if mode32 else capstone.CS_MODE_64)
     md.detail = True
 
     visited: set[int] = set()
@@ -172,7 +177,7 @@ def _scan_shard_x86(data: bytes, base_ea: int,
     strings = _cpu_string_scan(data, base_ea)
 
     elapsed = time.perf_counter() - t0
-    print(f"[capstone] x86_64 shard {shard_start:#x}-{shard_end:#x}: "
+    print(f"[capstone] {'x86' if mode32 else 'x86_64'} shard {shard_start:#x}-{shard_end:#x}: "
           f"{len(funcs)} funcs in {elapsed:.2f}s", flush=True)
     return ShardResult(funcs=funcs, bb_heads=bb_heads, strings=strings, elapsed_s=elapsed)
 
@@ -427,11 +432,13 @@ def scan_shard(data: bytes, base_ea: int,
     per-shard scan would miss simply because the calling instruction lives in
     a different shard than its target.
 
-    arch: "x86_64", "arm64", or "arm32"
+    arch: "x86_64", "x86" (32-bit), "arm64", or "arm32"
     """
     if entry_points is not None:
         if arch == "x86_64":
             return _scan_shard_x86(data, base_ea, shard_start, shard_end, entry_points)
+        if arch == "x86":
+            return _scan_shard_x86(data, base_ea, shard_start, shard_end, entry_points, mode32=True)
         if arch == "arm32":
             return _scan_shard_arm32(data, base_ea, shard_start, shard_end, entry_points)
         return _scan_shard_arm64(data, base_ea, shard_start, shard_end, entry_points)
@@ -442,8 +449,12 @@ def scan_shard(data: bytes, base_ea: int,
         prologues, bl_targets, _, _ = _arm32_scan(data, base_ea)
         entry_points = sorted(set(prologues) | set(bl_targets))
         return _scan_shard_arm32(data, base_ea, shard_start, shard_end, entry_points)
-    if arch == "x86_64":
-        if GPU_ENABLED:
+    if arch in ("x86_64", "x86"):
+        # The prologue scanner's boundary-byte + `push e/rbp` patterns are
+        # bitness-agnostic; its REX-prefixed patterns (48 83 EC ...) simply
+        # won't fire on 32-bit code, which is fine — they just contribute
+        # fewer seeds, and Capstone recursive descent does the real work.
+        if GPU_ENABLED and arch == "x86_64":
             try:
                 from .x86_64_scanner import _gpu_scan_x86
                 entry_points = _gpu_scan_x86(data, base_ea)
@@ -454,7 +465,8 @@ def scan_shard(data: bytes, base_ea: int,
         else:
             from .x86_64_scanner import _x86_prologues_numpy
             entry_points = _x86_prologues_numpy(data, base_ea)
-        return _scan_shard_x86(data, base_ea, shard_start, shard_end, entry_points)
+        return _scan_shard_x86(data, base_ea, shard_start, shard_end, entry_points,
+                               mode32=(arch == "x86"))
     else:
         # Prologues alone miss most functions -- not every ARM64 compiler emits
         # the exact `stp x29,x30,[sp,#-N]!` pattern (leaf functions skip it

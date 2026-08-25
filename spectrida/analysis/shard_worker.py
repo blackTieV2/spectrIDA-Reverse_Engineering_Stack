@@ -94,7 +94,9 @@ else:
         elif "arm" in proc:
             arch = "arm32"
         else:
-            arch = "x86_64"
+            # "metapc" covers BOTH 32- and 64-bit x86 — check the database
+            # bitness so 32-bit PEs don't get fed to the 64-bit decoder.
+            arch = "x86_64" if info.is_64bit() else "x86"
     except Exception:
         arch = "x86_64"
 
@@ -131,11 +133,14 @@ if not entries_path and arch in _UNSUPPORTED_SCAN_ARCHES:
     log(f"no GPU scanner for arch={arch!r}, skipping (will rely on whatever IDA's own analysis finds)")
 elif not entries_path:
     try:
-        if arch == "x86_64":
+        if arch in ("x86_64", "x86"):
+            # The prologue scanner's boundary-byte + push-e/rbp patterns are
+            # bitness-agnostic; the REX-prefixed ones simply won't fire on
+            # 32-bit code (fewer seeds, not wrong seeds).
             from ida_gpu_accel.config import GPU_ENABLED
             from ida_gpu_accel.x86_64_scanner import _gpu_scan_x86, _x86_prologues_numpy
             if raw:
-                if GPU_ENABLED:
+                if GPU_ENABLED and arch == "x86_64":
                     entry_points = _gpu_scan_x86(raw, shard_start)
                 else:
                     entry_points = _x86_prologues_numpy(raw, shard_start)
