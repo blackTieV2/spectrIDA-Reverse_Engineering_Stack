@@ -1,12 +1,12 @@
 # OKF log
 
 
-| 2026-08-26 | episodes/2026-08-26-pypi-shadowing.md | created | agent observation, user screenshot |
 Append-only index of knowledge-record events (created / promoted /
 superseded). Newest at top.
 
 | Date | Record | Event | By |
 |------|--------|-------|----|
+| 2026-08-26 | episodes/2026-08-26-pypi-shadowing.md | created | agent observation, user screenshot |
 | 2026-08-25 | episodes/2026-08-25-agent-loop-build.md | created+approved | user-authorised agent run |
 | 2026-08-25 | decisions/2026-08-25-agent-loop.md (dec-2026-08-25-002) | created+approved | user-authorised agent run |
 | 2026-08-25 | episodes/2026-08-25-patching-build.md | created+approved | user-authorised agent run |
