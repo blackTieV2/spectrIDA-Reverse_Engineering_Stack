@@ -235,3 +235,44 @@ OKF are inert until approved; a purge script ships with the feature.
 | Agent writes pollute workspace memory | Draft-only authority; single-writer lock; purge script |
 | MCP module state makes in-process reuse hard | Stop condition #1 surfaces it early; service-layer redesign reported before built |
 | Scope is genuinely large | Milestones as sub-packets at build time; skeleton loop lands first and is useful alone |
+
+---
+
+## Final Report — 2026-08-25 (built)
+
+**Status: BUILT.** Commits 6f56c01..7551889 on top of 7989370.
+
+### Deviations from this packet (all logged)
+
+1. **verify_decompilation is a stub.** Pre-build live-state check found the
+   medium-confidence gate's verifier returns `ready_for_verification` only.
+   Handled per dec-2026-08-25-002 #5: stub responses degrade to the human
+   queue with `verify_note = "verify_decompilation stub"`. A real verifier
+   returning `verified: true` upgrades items without any loop change —
+   test-pinned (`test_real_verifier_would_upgrade`).
+2. **Seen-set added.** Tests caught the loop re-explaining and re-queueing
+   the same queued functions every iteration, wasting LLM budget. Each
+   address is now processed exactly once per run; the loop terminates via
+   "all remaining functions processed" in the common case. The convergence
+   detector remains for multi-pass scenarios and is unit-pinned directly.
+3. **OKF root via config/env** (`SPECTRIDA_OKF_ROOT` or `[workspace]
+   okf_root`) — config has no `workspace_root` helper. Absent config, the
+   run works but writes no workspace records (report still returned via
+   `agent_status`).
+4. **ruff unavailable again (PyPI timeouts).** Mitigated with py_compile +
+   AST unused-import scan, as in tp-003. Deviation carried.
+
+### Test evidence
+
+- 23 new tests in tests/test_agent.py — scripted fake LLM, no Ollama/IDA/
+  Neo4j anywhere in the suite.
+- **94/94 passing** (71 pre-existing + 23 new).
+- Proven: caps fire on all three dimensions; thresholds route correctly;
+  stub degradation; budget exhaustion is a normal exit with the cap named;
+  failed explains terminate cleanly; draft memory dedupes and never raises;
+  convergence detector semantics.
+
+### Program status
+
+All four packets (001, 002a, 003, 004) are now BUILT. Push of 003+004
+commits is pending user device authorization.
