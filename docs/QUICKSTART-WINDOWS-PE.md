@@ -151,3 +151,20 @@ Apply names back in any IDA install: **File → Script file → target_names.idc
   that's why they differ.
 - **phantomrt** (emulate/fuzz/live-trace) is alpha. Treat `crash` verdicts
   as leads and `needs_state` as an honest shrug, not a bug.
+
+## Agent loop (bounded autonomous naming)
+
+Two MCP tools run a budget-capped naming pass over the binary:
+
+| Tool | Purpose |
+|------|---------|
+| `agent_run` | Start a bounded pass: explain unnamed functions, auto-apply high-confidence names, queue the rest. Returns `run_id` immediately. |
+| `agent_status` | Poll a run; when done, returns the full draft report (coverage delta, budget spend, human queue). |
+
+Guardrails: hard caps (default 200 LLM calls / 100 renames / 30 min),
+convergence stop (coverage delta < 2% over 3 iterations), medium-confidence
+names only apply when the decompilation verifier confirms them (today it
+is a stub, so they queue for you). Every run report and naming-pattern
+record the agent writes to the OKF workspace is a **draft** until you
+approve it. Set `SPECTRIDA_OKF_ROOT` (or `[workspace] okf_root` in
+`~/.spectrida/config.toml`) to enable workspace records.
