@@ -56,3 +56,19 @@ class TestFindIdaproDir:
 
     def test_empty_dir_passthrough(self):
         assert _find_idapro_dir("") == ""
+
+class TestIdaproPackageLayout:
+    """IDA 9.x ships idapro as a PACKAGE: <IDA>/idalib/python/idapro/."""
+
+    def test_idalib_python_package_layout(self, tmp_path):
+        pkg = tmp_path / "idalib" / "python" / "idapro"
+        pkg.mkdir(parents=True)
+        (pkg / "__init__.py").write_text("#")
+        assert _find_idapro_dir(str(tmp_path)) == str(pkg.parent)
+
+    def test_loose_module_still_preferred(self, tmp_path):
+        (tmp_path / "idapro.py").write_text("#")
+        pkg = tmp_path / "idalib" / "python" / "idapro"
+        pkg.mkdir(parents=True)
+        (pkg / "__init__.py").write_text("#")
+        assert _find_idapro_dir(str(tmp_path)) == str(tmp_path)

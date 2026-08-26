@@ -64,10 +64,17 @@ def _find_idapro_dir(ida_dir: str) -> str:
     if not ida_dir:
         return ida_dir
     root = Path(ida_dir)
+    # Loose-module layout: idapro.py
     if (root / "idapro.py").exists():
         return ida_dir
     for hit in sorted(root.glob("*/idapro.py")) + sorted(root.glob("*/*/idapro.py")):
         return str(hit.parent)
+    # Package layout (IDA 9.x ships idalib/python/idapro/__init__.py):
+    # the importable parent is the dir CONTAINING the idapro/ package.
+    for pkg in sorted(root.glob("*/idapro/__init__.py")) + \
+               sorted(root.glob("*/*/idapro/__init__.py")) + \
+               sorted(root.glob("*/*/*/idapro/__init__.py")):
+        return str(pkg.parent.parent)
     return ida_dir
 
 
