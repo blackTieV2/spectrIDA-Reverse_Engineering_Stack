@@ -9,7 +9,7 @@ qa_approved: false
 target_repo: "https://github.com/blackTieV2/spectrIDA-Reverse_Engineering_Stack"
 approved_branch: "master"
 approved_base: "c1c0570"
-target_head: "local be3cd11 (003+004 builds; NOT pushed; origin/master = af34c66)"
+target_head: "origin/master = 68de72e (003+004 PUSHED 2026-08-25)"
 working_tree_owner: ""
 last_reviewed: "2026-08-25"
 ---
