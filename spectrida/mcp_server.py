@@ -1174,6 +1174,119 @@ async def scale_verify(binary: str, sample_size: int = 20) -> dict:
     return {"job_id": job_id, "status": "started"}
 
 
+# ── agent loop (tp-2026-08-25-004) ────────────────────────────────────────────
+
+_AGENT_RUNS: dict[str, dict] = {}
+
+
+def _agent_seams(binary: str):
+    """Wire the loop's injected callables to the same seams the tools wrap.
+
+    In-process: no sockets, no MCP-over-wire (dec-2026-08-25-002 #4).
+    """
+    from spectrida.context import format_context_block, gather_context
+    from spectrida.core.explain import explain as _explain
+
+    async def list_functions() -> list[dict]:
+        db = await _live_db(binary)
+        return await db.list_functions()
+
+    async def baseline() -> dict:
+        return await baseline_naming(binary)
+
+    async def explain(addr: int):
+        db = await _live_db(binary)
+        insns = await db.disasm(addr)
+        pseudocode = ""
+        try:
+            pseudocode = await db.decompile(addr)
+        except Exception:
+            pass
+        ctx = gather_context(_g(), binary, addr, depth=2, max_neighbors=10,
+                             pseudocode=pseudocode or "")
+        return await _explain(insns,
+                              context_block=format_context_block(ctx),
+                              pseudocode=pseudocode)
+
+    async def rename(addr: int, name: str, comment: str) -> dict:
+        db = await _live_db(binary)
+        ok = await db.write_name(addr, name, comment)
+        return {"renamed": ok}
+
+    async def verify(addr: int, pseudocode: str) -> dict:
+        return await verify_decompilation(binary, hex(addr), pseudocode)
+
+    return list_functions, baseline, explain, rename, verify
+
+
+@mcp.tool()
+async def agent_run(binary: str, max_iterations: int = 10,
+                    llm_budget: int = 200, rename_budget: int = 100,
+                    time_budget_sec: float = 1800.0) -> dict:
+    """Start a bounded autonomous naming pass over the binary.
+
+    Iterates still-unnamed functions: explain (structured contract),
+    plan by confidence (high = auto-apply, medium = verify-then-queue,
+    low = human queue), apply and record draft OKF patterns.  Stops on
+    convergence (coverage delta < 2% over 3 iterations) or hard budget
+    caps.  Returns immediately with a run_id; poll agent_status(run_id).
+    The run report and all OKF records are drafts pending human review.
+    """
+    from spectrida.agent import AgentLoop, Budget
+
+    run_id = uuid.uuid4().hex[:8]
+    _AGENT_RUNS[run_id] = {"status": "running", "binary": binary,
+                           "progress": "starting", "created": time.time(),
+                           "report": None, "error": None}
+
+    async def _run() -> None:
+        rec = _AGENT_RUNS[run_id]
+        try:
+            from pathlib import Path
+
+            okf_cfg = config.get("workspace", "okf_root", "SPECTRIDA_OKF_ROOT")
+            okf_root = Path(okf_cfg) if okf_cfg else None
+            lf, bl, ex, rn, vf = _agent_seams(binary)
+            loop = AgentLoop(
+                binary=binary, list_functions=lf, baseline=bl, explain=ex,
+                rename=rn, verify=vf,
+                budget=Budget(llm_calls=llm_budget, seconds=time_budget_sec,
+                              renames=rename_budget),
+                okf_root=okf_root, max_iterations=max_iterations)
+            loop.run_id = run_id  # keep MCP and report ids aligned
+            result = await loop.run()
+            rec["status"] = "done"
+            rec["report"] = result.report.to_dict()
+            rec["progress"] = result.report.stop_reason
+        except Exception as exc:
+            rec["status"] = "error"
+            rec["error"] = f"{type(exc).__name__}: {exc}"
+
+    asyncio.create_task(_run())
+    return {"run_id": run_id, "status": "started"}
+
+
+@mcp.tool()
+async def agent_status(run_id: str) -> dict:
+    """Poll an agent run started by agent_run.
+
+    While running: status/progress only.  When done: the full run report
+    (coverage delta, budget spend, applied names, human queue).  All
+    agent-authored records remain drafts until a human approves them.
+    """
+    rec = _AGENT_RUNS.get(run_id)
+    if rec is None:
+        return {"error": f"unknown run_id: {run_id}"}
+    out = {"run_id": run_id, "status": rec["status"],
+           "binary": rec["binary"], "progress": rec["progress"]}
+    if rec["status"] == "done":
+        out["report"] = rec["report"]
+    if rec["error"]:
+        out["error"] = rec["error"]
+    return out
+
+
+
 def main() -> None:
     mcp.run()
 
