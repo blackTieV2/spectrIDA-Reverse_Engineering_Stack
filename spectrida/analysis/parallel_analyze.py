@@ -42,13 +42,43 @@ def _default_ida_dir() -> str:
             return cand
     return ""
 
-IDA_DIR   = os.environ.get("SPECTRIDA_IDALIB") or _default_ida_dir()
-IDAT_EXE  = str(Path(IDA_DIR) / "idat.exe")
-PYTHON    = sys.executable
-WORKER    = str(Path(__file__).parent / "shard_worker.py")
-MERGE_IDC = str(Path(__file__).parent / "merge_shards.idc")
+def _ida_dir() -> str:
+    """Resolve the IDA install dir: config.toml [ida] idalib (which itself
+    honours SPECTRIDA_IDALIB) first, then the platform default guess.
 
-sys.path.insert(0, IDA_DIR)
+    Previously this read the env var ONLY, so a user whom onboard had
+    just configured via config.toml still got workers pointed at the
+    nonexistent default path (No module named 'idapro' in every shard).
+    """
+    from spectrida import config
+    return config.idalib_dir() or _default_ida_dir()
+
+
+def _find_idapro_dir(ida_dir: str) -> str:
+    """Directory to put on sys.path so `import idapro` works.
+
+    idalib's Python module is not guaranteed to sit at the install root
+    (portable builds and some layouts keep it under python/ or similar).
+    Search shallow subdirectories; fall back to the root itself.
+    """
+    if not ida_dir:
+        return ida_dir
+    root = Path(ida_dir)
+    if (root / "idapro.py").exists():
+        return ida_dir
+    for hit in sorted(root.glob("*/idapro.py")) + sorted(root.glob("*/*/idapro.py")):
+        return str(hit.parent)
+    return ida_dir
+
+
+IDA_DIR     = _ida_dir()
+IDAPRO_DIR  = _find_idapro_dir(IDA_DIR)
+IDAT_EXE    = str(Path(IDA_DIR) / "idat.exe")
+PYTHON      = sys.executable
+WORKER      = str(Path(__file__).parent / "shard_worker.py")
+MERGE_IDC   = str(Path(__file__).parent / "merge_shards.idc")
+
+sys.path.insert(0, IDAPRO_DIR)
 
 
 # -- Step 1: Discovery pass -----------------------------------------------------
@@ -163,8 +193,7 @@ def run_shard(binary: str, shard_start: int, shard_end: int, result_path: str,
 
 MERGE_LOADER = ("""# -*- coding: utf-8 -*-
 import sys, json
-sys.path.insert(0, __import__("os").environ.get("SPECTRIDA_IDALIB") or
-                (r"C:\\Program Files\\IDA Professional 9.1" if sys.platform == "win32" else ""))
+sys.path.insert(0, r\"""" + IDAPRO_DIR + """\")  # resolved by the parent (config.toml-aware)
 sys.path.insert(0, r\"""" + str(Path(__file__).parent) + """\")
 import idapro
 idapro.enable_console_messages(False)
