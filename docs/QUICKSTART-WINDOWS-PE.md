@@ -35,12 +35,22 @@ Consequential actions (merge, push, release) need your explicit approval.
 Requirements: **IDA Pro 9.x with idalib** · **Python 3.10+** · **Ollama**
 (optional — only needed for AI naming).
 
+**Fork users: install from your clone, NOT PyPI.** `pip install spectrida`
+fetches the *upstream* package, which lacks every fork feature (Explain
+mode, dynamic markers, verified patching, agent loop).
+
 ```powershell
-pip install spectrida            # base: pipeline + TUI + scanners (lz4/capstone/numpy included)
-pip install "spectrida[gpu]"     # optional: torch, GPU prologue scanning
-pip install "spectrida[graph]"   # optional: Neo4j + MCP server
-pip install "spectrida[atlas]"   # optional, heavy: phantomrt dynamic layer
+pip uninstall spectrida -y       # remove any PyPI copy first
+cd %USERPROFILE%\Documents\GitHub\spectrIDA-Reverse_Engineering_Stack
+pip install -e .                 # editable install of THIS fork
+pip install -e ".[gpu]"          # optional: torch, GPU prologue scanning
+pip install -e ".[graph]"        # optional: Neo4j + MCP server
+pip install -e ".[atlas]"        # optional, heavy: phantomrt dynamic layer
 ```
+
+Verify you have the fork, not upstream — in the demo TUI you should see a
+marker column (✖/▶/?) on three rows and the **E** key should explain a
+function. No markers = you installed from PyPI.
 
 Sanity checks:
 
