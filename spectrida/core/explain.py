@@ -27,7 +27,8 @@ EXPLAIN_SYSTEM = (
     "OUTPUTS: <return value / globals written, or 'none evident'>\n"
     "SIDE_EFFECTS: <I/O, memory allocation, calls with side effects, or 'none'>\n"
     "SUGGESTED_NAME: <snake_case>\n"
-    "CONFIDENCE: high|medium|low - <one clause why>"
+    "CONFIDENCE: <exactly one word: high, medium, or low> - <one clause why>\n"
+    "Do NOT write the words 'high|medium|low' literally; pick ONE."
 )
 
 _MAX_INSNS = 80

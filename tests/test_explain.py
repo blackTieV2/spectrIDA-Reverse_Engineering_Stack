@@ -178,3 +178,17 @@ async def test_facade_stream_explain_demo() -> None:
     full = "".join([t async for t in db.stream_explain(0x1400013A0)])
     e = parse_explanation(full)
     assert e.purpose and e.confidence in {"high", "medium", "low"}
+
+
+def test_confidence_placeholder_echo_degrades_cleanly():
+    """Observed live (2026-08-26): qwen3:8b echoed the contract placeholder
+    'high|medium|low' verbatim. The parser must NOT guess a confidence —
+    unknown routes the item to the human queue in the agent loop."""
+    raw = ("PURPOSE: Compute the factorial\n"
+           "SUGGESTED_NAME: factorial\n"
+           "CONFIDENCE: high|medium|low - High confidence due to direct "
+           "correspondence between assembly operations (imul)")
+    e = parse_explanation(raw)
+    assert e.confidence == "unknown"
+    assert "High confidence" in e.confidence_why
+    assert e.suggested_name == "factorial"  # other fields still parsed
