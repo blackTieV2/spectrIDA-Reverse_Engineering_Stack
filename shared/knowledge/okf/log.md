@@ -6,6 +6,7 @@ superseded). Newest at top.
 
 | Date | Record | Event | By |
 |------|--------|-------|----|
+| 2026-08-26 | PROJECT_STATUS.md known-issues: idalib worker stderr DEVNULL + silent open_database exit | recorded (fix pending next build) | user-directed |
 | 2026-08-26 | episodes/2026-08-26-pypi-shadowing.md | created | agent observation, user screenshot |
 | 2026-08-25 | episodes/2026-08-25-agent-loop-build.md | created+approved | user-authorised agent run |
 | 2026-08-25 | decisions/2026-08-25-agent-loop.md (dec-2026-08-25-002) | created+approved | user-authorised agent run |

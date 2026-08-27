@@ -69,6 +69,17 @@ learning exercise on a simple x86 Windows PE.
   without IDA Pro 9.x licence + the same hardware.
 - `diaphora_*` MCP tools require a Diaphora checkout two levels above the
   package; undocumented upstream.
+- **TODO (bug, fix next build):** `core/ida.py open_ida()` spawns the
+  idalib worker with `stderr=asyncio.subprocess.DEVNULL` — when the worker
+  dies before its @@RESP handshake, the user gets only "idalib worker
+  exited unexpectedly" with zero evidence (hit live 2026-08-26 during the
+  patch round-trip gate). Fix: capture stderr, include the tail in the
+  RuntimeError; the regression test must name the real error text
+  observed on the operator machine.
+- **TODO (investigate):** `idapro.open_database(.i64)` exits the process
+  silently (no rc, no traceback) when the database is already open in
+  another idalib process (single-opener rule) — confirm and, if true,
+  fail fast with a clear "database is open elsewhere" message.
 - phantomrt is alpha (0.1.x); treat verdicts as leads, not proof.
 
 ## Execution hold
