@@ -1108,13 +1108,25 @@ async def verify_decompilation(
     binary: str, address: str, pseudocode: str,
     max_attempts: int = 3,
 ) -> dict:
-    """Phase 2: self-verifying decompilation for one function.
+    """Verify candidate C against the original function bytes.
 
-    Feed pseudocode to the model, compile, emulate, compare with original.
-    On mismatch, feed the behavioral diff back and retry.
+    Pipeline (tp-2026-08-27-005): read the original bytes from the live .i64,
+    compile *pseudocode* with the host gcc, emulate both in Unicorn (bitness
+    from the database — 32-bit cdecl and 64-bit MS ABI both supported), and
+    compare return value + memory writes with tolerance.
 
-    Returns verified C code if the oracle confirms equivalence.
+    *pseudocode* must be compilable C containing exactly one function — raw
+    Hex-Rays output is NOT compilable and degrades to inconclusive (that is
+    data, not a crash).  If empty, the Hex-Rays decompilation is fetched and
+    will almost certainly degrade the same way; the intended caller supplies
+    model-rewritten C.
+
+    Single-shot: max_attempts is reserved for a future LLM refinement loop
+    (design packet deviation D2).  verified:true lets the agent loop upgrade
+    a medium-confidence rename to auto-apply; every failure path returns
+    verified:false so the planner routes to the human queue.
     """
+    from spectrida.verify.oracle import verify_function
 
     db = await _live_db(binary)
     addr = _norm_addr(address)
@@ -1122,11 +1134,46 @@ async def verify_decompilation(
     if not pseudocode:
         pseudocode = await db.decompile(addr)
 
+    def _inconclusive(reason: str) -> dict:
+        return {"address": address, "verified": False,
+                "status": "inconclusive", "reason": reason,
+                "details": "", "pseudocode": pseudocode[:500]}
+
+    info = await db.info(addr)
+    if not info:
+        return _inconclusive(f"no function at {address}")
+    size = int(info["end"]) - int(info["start"])
+    if size <= 0 or size > 0x10000:  # emulator maps one 64 KiB code page
+        return _inconclusive(f"function size {size} outside emulatable range")
+
+    original = await db.read_bytes(addr, size)
+    if not original:
+        return _inconclusive("could not read original bytes from database")
+
+    bits = 64 if (await db.bits()) == "64" else 32
+
+    try:
+        verdict = await asyncio.to_thread(
+            verify_function, original, pseudocode, bits=bits)
+    except Exception as exc:
+        return _inconclusive(f"verifier error: {type(exc).__name__}: {exc}")
+
+    if "gcc not found" in verdict.reason or "objdump" in verdict.reason:
+        status = "no_toolchain"
+    elif verdict.equivalent:
+        status = "verified"
+    elif verdict.return_match or verdict.memory_match:
+        status = "mismatch"
+    else:
+        status = "inconclusive" if not verdict.details else "mismatch"
+
     return {
         "address": address,
+        "verified": bool(verdict.equivalent),
+        "status": status,
+        "reason": verdict.reason,
+        "details": verdict.details,
         "pseudocode": pseudocode[:500],
-        "status": "ready_for_verification",
-        "note": "Full pipeline requires binary bytes extraction",
     }
 
 
