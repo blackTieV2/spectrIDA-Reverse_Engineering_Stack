@@ -27,19 +27,45 @@ class OracleVerdict:
     details: str = ""
 
 
-def compile_c_to_shared(c_code: str, out_path: str) -> dict:
-    """Compile C to a shared library (.dll on Windows, .so on Linux)."""
+def _find_tool(name: str) -> str:
+    """Resolve a host toolchain binary (gcc/objdump).
+
+    Order: SPECTRIDA_<NAME> env override → known WinLibs install → PATH.
+    Returns "" when unavailable — callers degrade, never crash
+    (dec-2026-08-27-005 D4: toolchain absence is data, not an exception).
+    """
+    import shutil
+    env = os.environ.get(f"SPECTRIDA_{name.upper()}")
+    if env and os.path.exists(env):
+        return env
+    if name in ("gcc", "g++"):
+        winlibs = (r"C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages"
+                   r"\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe"
+                   r"\mingw64\bin\g++.exe")
+        if os.path.exists(winlibs):
+            return winlibs
+    found = shutil.which(name)
+    if not found and name == "gcc":
+        found = shutil.which("g++")
+    return found or ""
+
+
+def compile_c_to_shared(c_code: str, out_path: str, *, bits: int = 64) -> dict:
+    """Compile C to a shared library (.dll on Windows, .so on Linux).
+
+    bits=32 passes -m32 (requires a multilib-capable gcc; absence is a
+    normal compile failure, reported in the error string)."""
     fd, c_file = tempfile.mkstemp(suffix=".c")
     os.write(fd, c_code.encode())
     os.close(fd)
     try:
-        gcc_path = r"C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin\g++.exe"
-        if not os.path.exists(gcc_path):
-            import shutil
-            gcc_path = shutil.which("gcc") or ""
+        gcc_path = _find_tool("gcc")
         if not gcc_path:
             return {"ok": False, "error": "gcc not found"}
-        cmd = [gcc_path, "-O2", "-std=c++11", "-nostdlib", "-shared", "-o", out_path, c_file]
+        cmd = [gcc_path, "-O2", "-std=c++11", "-nostdlib", "-shared"]
+        if bits == 32:
+            cmd.append("-m32")
+        cmd += ["-o", out_path, c_file]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if r.returncode == 0:
             return {"ok": True, "path": out_path}
@@ -53,8 +79,12 @@ def compile_c_to_shared(c_code: str, out_path: str) -> dict:
             pass
 
 
-def extract_function_bytes(dll_path: str, func_name: str) -> dict:
-    """Extract compiled bytes for a function from objdump output."""
+def extract_function_bytes(dll_path: str, func_name: str = "") -> dict:
+    """Extract compiled bytes for a function from objdump output.
+
+    func_name="" extracts the FIRST code label — the verify pipeline cannot
+    know the function name inside caller-supplied C (contract: the C source
+    contains exactly one function)."""
     try:
         import os
         # Use os.popen for Windows compatibility with MSYS2 objdump
@@ -64,7 +94,13 @@ def extract_function_bytes(dll_path: str, func_name: str) -> dict:
         code_hex = ""
 
         for line in lines:
-            if f"<{func_name}>:" in line:
+            if func_name:
+                matched = f"<{func_name}>:" in line
+            else:
+                # first "<name>:" label line (objdump prints e.g.
+                # "0000000000001100 <target>:"); skip section headers
+                matched = bool(re.search(r"<[^>]+>:\s*$", line))
+            if matched:
                 in_func = True
                 continue
             if in_func:
@@ -202,16 +238,24 @@ def emulate_function(
     args: list[int] | None = None,
     stack_size: int = 0x10000,
     pseudocode: str = '',
+    bits: int = 64,
 ) -> EmulationResult:
-    """Emulate x86-64 function with Windows calling convention."""
-    from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_MEM_WRITE
+    """Emulate a function with the Windows calling convention.
+
+    bits=64: UC_MODE_64, args in rcx/rdx/r8/r9, return in RAX.
+    bits=32: UC_MODE_32, cdecl — args pushed right-to-left at [esp+4]…,
+    return in EAX (dec-2026-08-27-005 D1: bitness comes from the live
+    database, never assumed)."""
+    from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_MODE_32, UC_HOOK_MEM_WRITE
     from unicorn.x86_const import (
-        UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX,
-        UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RSP,
+        UC_X86_REG_RAX, UC_X86_REG_EAX, UC_X86_REG_RCX, UC_X86_REG_RDX,
+        UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RSP, UC_X86_REG_ESP,
     )
 
     try:
-        mu = Uc(UC_ARCH_X86, UC_MODE_64)
+        mode = UC_MODE_64 if bits == 64 else UC_MODE_32
+        mu = Uc(UC_ARCH_X86, mode)
+        ptr_fmt, ptr_size = ("<Q", 8) if bits == 64 else ("<I", 4)
 
         # Map code and stack
         mu.mem_map(base_addr, 0x10000)
@@ -223,29 +267,33 @@ def emulate_function(
             struct_fields = parse_struct_layout(pseudocode)
             for addr, val in struct_fields.items():
                 try:
-                    mu.mem_write(addr, struct.pack('<Q', val))
+                    mu.mem_write(addr, struct.pack(ptr_fmt, val))
                 except Exception:
                     pass  # Address might not be mapped
-
-        # Stub external calls: if instruction pointer goes to unmapped area,
-        # return 0 and continue (simulates external function returning 0)
-        def hook_code(uc, address, size, user_data):
-            # If we hit unmapped code, skip to next safe point
-            pass
 
         stack_base = base_addr + 0x10000
         mu.mem_map(stack_base, stack_size)
         stack_top = stack_base + stack_size
 
-        # Set stack pointer (with valid return address area)
-        mu.mem_write(stack_top - 8, bytes(8))  # zero out return area
-        mu.reg_write(UC_X86_REG_RSP, stack_top - 16)
+        # Set stack pointer well below the mapped top, with room for the
+        # return address slot and cdecl args above it.
+        sp_reg = UC_X86_REG_RSP if bits == 64 else UC_X86_REG_ESP
+        sp = stack_top - 0x100
+        mu.mem_write(sp, bytes(ptr_size))  # zero return address slot
+        mu.reg_write(sp_reg, sp)
 
-        # Windows x64: rcx, rdx, r8, r9
-        arg_regs = [UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9]
         if args:
-            for i, arg in enumerate(args[:4]):
-                mu.reg_write(arg_regs[i], arg)
+            if bits == 64:
+                # Windows x64: rcx, rdx, r8, r9
+                arg_regs = [UC_X86_REG_RCX, UC_X86_REG_RDX,
+                            UC_X86_REG_R8, UC_X86_REG_R9]
+                for i, arg in enumerate(args[:4]):
+                    mu.reg_write(arg_regs[i], arg)
+            else:
+                # cdecl: [esp] = return addr, args at [esp+4], [esp+8], …
+                for i, arg in enumerate(args):
+                    mu.mem_write(sp + ptr_size * (i + 1),
+                                 struct.pack(ptr_fmt, arg & 0xFFFFFFFF))
 
         # Track memory writes
         memory_writes: dict[int, int] = {}
@@ -273,9 +321,9 @@ def emulate_function(
             if "Invalid memory" not in str(e) and "Invalid instruction" not in str(e):
                 return EmulationResult(error=f"emulation error: {e}")
 
-        # Capture return value (RAX holds return in x64 ABI)
+        # Capture return value (RAX in x64 ABI, EAX in cdecl)
         try:
-            ret = mu.reg_read(UC_X86_REG_RAX)
+            ret = mu.reg_read(UC_X86_REG_RAX if bits == 64 else UC_X86_REG_EAX)
         except Exception:
             ret = 0
 
@@ -283,7 +331,8 @@ def emulate_function(
         if memory_writes:
             mem_data = b""
             for addr in sorted(memory_writes.keys()):
-                mem_data += struct.pack("<Q", addr) + struct.pack("<Q", memory_writes[addr])
+                mem_data += (struct.pack(ptr_fmt, addr)
+                             + struct.pack(ptr_fmt, memory_writes[addr]))
             mem_hash = hashlib.md5(mem_data).hexdigest()
         else:
             mem_hash = "empty"
@@ -368,16 +417,22 @@ def verify_function(
     original_bytes: bytes,
     recompiled_c: str,
     *,
-    func_name: str = "target",
+    func_name: str = "",
     args: list[int] | None = None,
+    bits: int = 64,
 ) -> OracleVerdict:
-    """Full pipeline: compile C -> emulate both -> compare."""
+    """Full pipeline: compile C -> emulate both -> compare.
+
+    func_name="" extracts the first function in the compiled object —
+    the caller (verify_decompilation) cannot know the name inside
+    model-supplied C; the C must contain exactly one function.
+    bits must match the original binary's width (from the live .i64)."""
     import tempfile
     fd, dll = tempfile.mkstemp(suffix=".dll")
     os.close(fd)
 
     try:
-        compile_result = compile_c_to_shared(recompiled_c, dll)
+        compile_result = compile_c_to_shared(recompiled_c, dll, bits=bits)
         if not compile_result["ok"]:
             return OracleVerdict(reason=f"compile failed: {compile_result['error'][:200]}")
 
@@ -387,8 +442,8 @@ def verify_function(
 
         recompiled_bytes = bytes.fromhex(extract_result["bytes"])
 
-        orig_result = emulate_function(original_bytes, args=args)
-        recomp_result = emulate_function(recompiled_bytes, args=args)
+        orig_result = emulate_function(original_bytes, args=args, bits=bits)
+        recomp_result = emulate_function(recompiled_bytes, args=args, bits=bits)
 
         return compare_emulations(orig_result, recomp_result)
     finally:
