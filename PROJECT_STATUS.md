@@ -94,9 +94,11 @@ User-side live acceptance (operator machine only):
 1. `spectrida formats` + `onboard` — IDA discovery (Lesson 1 checkpoint)
 2. Compile target.c (`cl /Od /Zi /MT`) → verify machine type 0x14c
 3. `spectrida --demo` — E key + marker column
-4. Patch/revert round-trip on target.exe → inspect `.patchlog.jsonl`
+4. ~~Patch/revert round-trip~~ ✅ DONE 2026-08-27 (journal-before-write,
+   verified apply, Capstone decode `ret`, exact revert — after fixing the
+   patch_bytes void-return bug live, 81f643a)
 5. `ruff check spectrida/`
-6. `agent_run` once Ollama + IDA + Neo4j are live → review draft report
+6. `agent_run` once Neo4j is live → review draft report
 
 Then: protocol extraction (option D) as a follow-up packet **if** the
 agent loop's observed live call pattern justifies it (per Part B
