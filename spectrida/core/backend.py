@@ -42,6 +42,8 @@ class Backend:
     async def verified_patch(self, addr, data: bytes) -> dict: ...
     async def list_patches(self) -> list[dict]: ...
     async def revert_patch(self, patch_id: str) -> dict: ...
+    async def read_bytes(self, addr, size: int) -> bytes | None: ...
+    async def bits(self) -> str: ...
     async def close(self) -> None: ...
 
 
@@ -134,6 +136,12 @@ class RealBackend(Backend):
     async def revert_patch(self, patch_id):
         return await _ida.revert_patch(self._ida, patch_id)
 
+    async def read_bytes(self, addr, size: int):
+        return await _ida.get_bytes(self._ida, addr, size)
+
+    async def bits(self):
+        return await _ida.bits(self._ida)
+
 
 class DemoBackend(Backend):
     demo = True
@@ -155,6 +163,12 @@ class DemoBackend(Backend):
                 f["name"] = name
                 return True
         return True
+
+    async def read_bytes(self, addr, size: int):
+        return b"\x55\x8b\xec" + bytes(max(0, size - 4)) + b"\xc3"  # canned prologue…ret
+
+    async def bits(self):
+        return "64"
 
     def stream_name(self, addr, insns, callees, callers):
         return _demo.stream_name(addr)

@@ -76,6 +76,7 @@ class IDADatabase:
     def __init__(self, backend: RealBackend | DemoBackend) -> None:
         self._b = backend
         self._funcs: list[FunctionInfo] | None = None
+        self._bits: str | None = None
 
     # ── core queries ────────────────────────────────────────────────────────
 
@@ -139,6 +140,17 @@ class IDADatabase:
     async def revert_patch(self, patch_id: str) -> dict:
         """Restore the original bytes recorded in journal entry *patch_id*."""
         return await self._b.revert_patch(patch_id)
+
+    async def read_bytes(self, address: int | str, size: int) -> bytes | None:
+        """Raw bytes for *size* bytes at *address*, from the live .i64."""
+        return await self._b.read_bytes(address, size)
+
+    async def bits(self) -> str:
+        """"32" or "64" — database bitness, drives emulation/decode modes.
+        Cached: a database's width never changes."""
+        if self._bits is None:
+            self._bits = await self._b.bits()
+        return self._bits
 
     # ── AI naming ───────────────────────────────────────────────────────────
 
