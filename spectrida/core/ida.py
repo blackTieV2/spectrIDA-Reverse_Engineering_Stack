@@ -76,9 +76,14 @@ for line in sys.stdin:
         elif cmd == "patch":
             addr = _norm(a["address"]); data = bytes.fromhex(a["hex"])
             import ida_bytes
-            ok = ida_bytes.patch_bytes(addr, data)
+            # NOTE: the bulk variant ida_bytes.patch_bytes returns None (void
+            # SWIG wrapper) — bool(None) made every successful patch report
+            # "refused" while the .i64 was silently patched (2026-08-27 live).
+            # patch_byte returns a real per-byte success flag.
+            results = [bool(ida_bytes.patch_byte(addr + i, b))
+                       for i, b in enumerate(data)]
             idc.save_database("")
-            emit({"ok": True, "result": bool(ok)})
+            emit({"ok": True, "result": all(results)})
         elif cmd == "xrefs_to":   # callers of this function
             addr = _norm(a["address"]); seen = {};
             for xr in idautils.XrefsTo(addr):

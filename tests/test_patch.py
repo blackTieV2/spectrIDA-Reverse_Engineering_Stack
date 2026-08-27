@@ -158,3 +158,14 @@ async def test_readback_mismatch_auto_reverts(tmp_path) -> None:
     # journal entry exists and is flagged reverted
     entries = patchlog.list_entries(i64)
     assert len(entries) == 1 and entries[0]["reverted"] is True
+
+
+def test_worker_patch_uses_patch_byte_not_void_wrapper():
+    """Regression for the live failure of 2026-08-27: ida_bytes.patch_bytes
+    returns None (void SWIG wrapper); bool(None) reported 'refused' while the
+    patch actually landed in the .i64. The worker must use patch_byte, whose
+    return value is a real success flag."""
+    from spectrida.core import ida as ida_mod
+    assert "patch_byte(" in ida_mod._WORKER
+    patch_branch = ida_mod._WORKER.split('cmd == "patch"')[1].split("elif")[0]
+    assert "patch_bytes(" not in patch_branch
