@@ -2,7 +2,7 @@
 type: project-status
 project: "spectrida-re-stack"
 status: active
-current_stage: 05-qa (awaiting user-side live acceptance)
+current_stage: 05-qa (tp-005 verifier built; agent_run live UAT next)
 execution_hold: true
 build_approved: true
 qa_approved: false
@@ -53,16 +53,22 @@ learning exercise on a simple x86 Windows PE.
   report → NO-GO for free backend today (dec-2026-08-25-002 #3)
 - tp-004 Agent loop: `spectrida/agent/` (budget/planner/memory/report/
   loop), MCP `agent_run`/`agent_status`; bounded, draft-only, in-process
+- tp-005 Real verifier: `verify_decompilation` wired to the differential
+  oracle (`verify/oracle.py` 32/64-bit, gcc/objdump resolution, original
+  bytes via `read_bytes`/`bits` exposed through Backend → IDADatabase).
+  Single-shot (deviation D2); planner contract unchanged.
 
-**Tests:** 94/94 passing (35 at session start).
+**Tests:** 124/124 passing (35 at session start).
 
 ## Known issues (open)
 
 - `spectrida/verify/` + `spectrida/memory/`: 229 pre-existing ruff errors;
   upstream CI lint step was already red. Not remediated (out of scope).
-- `verify_decompilation` MCP tool is a stub (returns
-  `ready_for_verification`). Agent loop degrades medium-confidence names
-  to the human queue until the real verifier lands (dec-2026-08-25-002 #5).
+- `verify_decompilation` is real (tp-005, dc86eaf). Degrades — never
+  fakes — when the host lacks gcc/objdump (`no_toolchain`) or the
+  candidate C doesn't compile (raw Hex-Rays output is not compilable C;
+  the intended input is model-rewritten C). 32-bit emulation validated
+  in tests; live 32-bit UAT pending on the operator machine.
 - ruff not run on 002a/003/004 code (sandbox PyPI down); py_compile +
   AST scan used instead. Run `ruff check spectrida/` on operator machine.
 - Benchmark numbers in README are self-reported upstream; unverifiable
