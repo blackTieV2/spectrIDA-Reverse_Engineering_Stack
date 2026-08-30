@@ -40,7 +40,7 @@ dependencies = [
 [project.optional-dependencies]
 gpu = ["torch>=2.0"]
 dev = ["pytest>=8", "ruff>=0.6"]
-graph = ["neo4j>=5.0", "mcp>=1.0"]
+graph = ["neo4j>=5.0", "mcp>=1.0,<2"]
 # Dynamic analysis (Atlas): emulate / live-instrument / fuzz functions and write
 # runtime facts onto the graph. Heavy (unicorn/frida/torch) → opt-in only; the
 # base spectrIDA install pulls none of it. Enables the emulate_function /
