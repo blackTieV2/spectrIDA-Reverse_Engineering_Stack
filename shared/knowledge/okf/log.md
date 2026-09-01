@@ -18,3 +18,4 @@ superseded). Newest at top.
 | 2026-08-25 | decisions/2026-08-25-audit-hardening.md (dec-2026-08-25-001) | created+approved | user-authorised agent run |
 | 2026-08-25 | episodes/2026-08-25-upstream-audit.md | created | user-authorised agent run |
 | 2026-08-27 | episodes/2026-08-27-verify-decompilation.md | created (draft, agent-authored) | tp-005: verify_decompilation wired to differential oracle; 124/124 green |
+| 2026-09-01 | episodes/2026-09-01-verify-live-uat.md | created (draft, agent-authored) | verify live UAT pass; 4 live-found bugs fixed (mcp pin, objdump wiring, unicorn extra, stack-filter) |

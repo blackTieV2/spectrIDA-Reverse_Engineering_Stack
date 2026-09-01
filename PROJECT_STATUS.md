@@ -68,7 +68,12 @@ learning exercise on a simple x86 Windows PE.
   fakes — when the host lacks gcc/objdump (`no_toolchain`) or the
   candidate C doesn't compile (raw Hex-Rays output is not compilable C;
   the intended input is model-rewritten C). 32-bit emulation validated
-  in tests; live 32-bit UAT pending on the operator machine.
+  in tests; live 32-bit UAT PASSED 2026-09-01 on BlackTie (factorial:
+  equivalent C verified:true, mutated C mismatch on return value).
+  Three live-found bugs fixed en route: mcp 2.x breaking rename (pin
+  <2), objdump env override never wired (8836f69), unicorn missing from
+  [graph] extra (5ebeee4), stack-frame writes false-mismatching
+  equivalent functions (63513f1).
 - ruff not run on 002a/003/004 code (sandbox PyPI down); py_compile +
   AST scan used instead. Run `ruff check spectrida/` on operator machine.
 - Benchmark numbers in README are self-reported upstream; unverifiable
