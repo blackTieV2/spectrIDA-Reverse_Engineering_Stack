@@ -240,3 +240,53 @@ class TestMemory:
                                     addr=1, name="n", confidence="high",
                                     confidence_why="", purpose="",
                                     date="2026-08-25") is None
+
+
+
+# ── three-state name classification (tp-2026-09-01-006; live falsification:
+# a Lumina-resolved db has zero sub_* — the loop must say WHICH kind of
+# nothing it found, and never spend LLM budget on library code) ──────────────
+
+class TestClassifyName:
+    @pytest.mark.parametrize("name", [None, "", "sub_401000", "sub_DEADBEEF"])
+    def test_unnamed(self, name):
+        from spectrida.agent.loop import classify_name
+        assert classify_name(name) == "unnamed"
+
+    @pytest.mark.parametrize("name", [
+        "j_sub_401000",                    # thunk to unnamed
+        "j_?type_case_d@?$output_processor@XXZ",  # thunk to mangled CRT
+        "?ReadFile@@YAXXZ",                # MSVC mangled
+        "_ZN3foo3barEv",                   # Itanium mangled
+    ])
+    def test_library(self, name):
+        from spectrida.agent.loop import classify_name
+        assert classify_name(name) == "library"
+
+    @pytest.mark.parametrize("name", ["factorial", "main", "parse_header"])
+    def test_named(self, name):
+        from spectrida.agent.loop import classify_name
+        assert classify_name(name) == "named"
+
+
+class TestLibrarySkipping:
+    def test_library_functions_never_spend_llm(self, tmp_path):
+        w = FakeWorld(2)
+        w.funcs.append({"start": 0x5000, "name": "j_?type_case_d@?$x@@"})
+        w.funcs.append({"start": 0x5010, "name": "_ZN3foo3barEv"})
+        result = run(w.loop(okf_root=tmp_path).run())
+        rep = result.report
+        assert rep.library_skipped == 2
+        assert w.llm_calls == 2          # only the two sub_ functions
+        assert set(w.renamed) == {0x1000, 0x1010}
+
+    def test_all_library_stop_reason_says_why(self, tmp_path):
+        w = FakeWorld(0)
+        w.funcs.append({"start": 0x5000, "name": "j_?x@@"})
+        result = run(w.loop(okf_root=tmp_path).run())
+        rep = result.report
+        assert "no unnamed functions remain" in rep.stop_reason
+        assert "library" in rep.stop_reason
+        assert rep.library_skipped == 1
+        # honest coverage: no work happened, so no fake 100→0 or 50→0 delta
+        assert rep.coverage_end == rep.coverage_start

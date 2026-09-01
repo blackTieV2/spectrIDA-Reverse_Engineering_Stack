@@ -33,8 +33,27 @@ RenameFn = Callable[[int, str, str], Awaitable[Any]]
 VerifyFn = Callable[[int, str], Awaitable[dict]]
 
 
-def _unnamed(name: str | None) -> bool:
-    return not name or name.startswith("sub_")
+def classify_name(name: str | None) -> str:
+    """Three-state classification (tp-2026-09-01-006).
+
+    "unnamed" — sub_* or empty: AI naming work.
+    "library" — jump thunks (j_…) or mangled names (MSVC ?, Itanium _ZN):
+                known library code resolved by Lumina/symbols. Never
+                AI-renamed — the model's job is the user's code, not CRT.
+    "named"   — anything else: already meaningful.
+
+    Live falsification 2026-09-01 (BlackTie, Lumina-resolved db): a binary
+    with zero sub_* made the old boolean filter report "no unnamed
+    functions" — true under its definition, blind to WHY. The loop must
+    say which kind of nothing it found.
+    """
+    if not name or name.startswith("sub_"):
+        return "unnamed"
+    if name.startswith("j_"):          # jump thunk (incl. j_sub_, j_?…)
+        return "library"
+    if "?" in name or name.startswith("_ZN"):  # MSVC / Itanium mangling
+        return "library"
+    return "named"
 
 
 @dataclass
@@ -77,18 +96,32 @@ class AgentLoop:
     async def run(self) -> LoopResult:
         report = RunReport(run_id=self.run_id, binary=self.binary,
                            coverage_start=await self._coverage())
+        report.coverage_end = report.coverage_start  # honest default: unchanged
         coverage_history = [report.coverage_start]
         stop = "max_iterations reached"
         try:
             for it in range(1, self.max_iterations + 1):
                 report.iterations = it
                 self.tracker.check()
-                funcs = [f for f in await self._list()
-                         if _unnamed(f.get("name"))
-                         and int(f.get("addr", f.get("start"))) not in self._seen]
+                all_funcs = await self._list()
+                funcs = []
+                for f in all_funcs:
+                    addr = int(f.get("addr", f.get("start")))
+                    if addr in self._seen:
+                        continue
+                    cls = classify_name(f.get("name"))
+                    if cls == "library":
+                        report.library_skipped += 1
+                        self._seen.add(addr)  # classified once per run
+                    elif cls == "unnamed":
+                        funcs.append(f)
                 if not funcs:
-                    stop = ("no unnamed functions remain"
-                            if not self._seen else "all remaining functions processed")
+                    suffix = (f" ({report.library_skipped} library/thunk "
+                              f"functions skipped)") if report.library_skipped else ""
+                    # "no work ever existed" vs "work existed, we finished it" —
+                    # library classifications don't count as work
+                    stop = (("no unnamed functions remain" if not report.items
+                             else "all remaining functions processed") + suffix)
                     break
                 for f in funcs:
                     # FunctionInfo uses "start"; graph rows use "addr".

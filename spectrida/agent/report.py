@@ -17,6 +17,7 @@ class RunReport:
     coverage_end: float = 0.0
     budget_summary: dict = field(default_factory=dict)
     items: list[PlanItem] = field(default_factory=list)
+    library_skipped: int = 0  # Lumina/mangled/thunk functions skipped (tp-006)
 
     def by_action(self, action: Action) -> list[PlanItem]:
         return [i for i in self.items if i.action == action]
@@ -37,6 +38,7 @@ class RunReport:
             "human_queue": [vars(i) | {"action": i.action.value}
                             for i in self.by_action(Action.HUMAN_QUEUE)],
             "skipped": sum(1 for i in self.items if i.action == Action.SKIP),
+            "library_skipped": self.library_skipped,
         }
 
     def to_markdown(self) -> str:

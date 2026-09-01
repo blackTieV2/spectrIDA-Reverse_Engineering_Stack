@@ -57,6 +57,10 @@ learning exercise on a simple x86 Windows PE.
   oracle (`verify/oracle.py` 32/64-bit, gcc/objdump resolution, original
   bytes via `read_bytes`/`bits` exposed through Backend → IDADatabase).
   Single-shot (deviation D2); planner contract unchanged.
+- tp-006 Three-state name classification: agent loop distinguishes
+  unnamed (sub_*) / library (thunks + mangled, never AI-renamed) /
+  named; honest coverage and stop reasons. Triggered by live
+  falsification on the Lumina db (0 sub_* functions).
 
 **Tests:** 124/124 passing (35 at session start).
 
