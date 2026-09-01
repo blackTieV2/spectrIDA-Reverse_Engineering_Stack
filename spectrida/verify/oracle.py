@@ -87,8 +87,12 @@ def extract_function_bytes(dll_path: str, func_name: str = "") -> dict:
     contains exactly one function)."""
     try:
         import os
-        # Use os.popen for Windows compatibility with MSYS2 objdump
-        r = os.popen("objdump -d " + str(dll_path)).read()
+        objdump = _find_tool("objdump")
+        if not objdump:
+            return {"ok": False, "error": "objdump not found"}
+        # os.popen for Windows compatibility with MSYS2 objdump; quoted path
+        # (WinGet installs live under user dirs that may contain spaces)
+        r = os.popen(f'"{objdump}" -d "{dll_path}"').read()
         lines = r.splitlines()
         in_func = False
         code_hex = ""

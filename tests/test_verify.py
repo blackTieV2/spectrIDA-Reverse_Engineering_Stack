@@ -215,3 +215,23 @@ def test_tool_mismatch_path(monkeypatch):
     assert r["verified"] is False
     assert r["status"] == "mismatch"
     assert r["details"]
+
+
+
+# ── objdump resolution regression (live BlackTie 2026-09-01: SPECTRIDA_GCC was
+# honoured but extract_function_bytes shelled out to a bare "objdump" on PATH —
+# the env override existed and was never used) ────────────────────────────────
+
+def test_extract_resolves_objdump_via_find_tool():
+    import inspect
+    from spectrida.verify import oracle
+    src = inspect.getsource(oracle.extract_function_bytes)
+    assert '_find_tool("objdump")' in src
+    assert 'os.popen("objdump' not in src  # bare-PATH fallback must stay dead
+
+
+def test_extract_missing_objdump_is_data(monkeypatch):
+    monkeypatch.setattr("spectrida.verify.oracle._find_tool", lambda name: "")
+    r = extract_function_bytes("whatever.dll", "")
+    assert r["ok"] is False
+    assert "objdump not found" in r["error"]
