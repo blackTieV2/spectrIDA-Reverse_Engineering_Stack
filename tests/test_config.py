@@ -36,3 +36,16 @@ def test_mcp_pinned_below_2():
     graph_line = next(l for l in text.splitlines()
                       if l.strip().startswith("graph = ["))
     assert 'mcp>=1.0,<2' in graph_line
+
+
+
+def test_graph_extra_includes_unicorn():
+    """verify_decompilation's oracle emulates with Unicorn but is reachable
+    via the [graph] extra — unicorn must be there, not only in [atlas]
+    (live BlackTie 2026-09-01: compile+extract passed, emulation died with
+    ModuleNotFoundError: No module named 'unicorn')."""
+    import pathlib
+    text = (pathlib.Path(__file__).parent.parent / "pyproject.toml").read_text()
+    graph_line = next(l for l in text.splitlines()
+                      if l.strip().startswith("graph = ["))
+    assert "unicorn" in graph_line
