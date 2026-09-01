@@ -235,3 +235,38 @@ def test_extract_missing_objdump_is_data(monkeypatch):
     r = extract_function_bytes("whatever.dll", "")
     assert r["ok"] is False
     assert "objdump not found" in r["error"]
+
+
+
+# ── stack-writes-are-compiler-artifacts (live BlackTie 2026-09-01: MSVC-built
+# factorial wrote 3 stack slots, MinGW -O2 wrote 1; returns matched, memory
+# comparison false-MISMATCHed. Stack traffic is not observable behavior.) ─────
+
+# mov eax,5 ; ret                                    — register-only
+X64_REG_ONLY = bytes.fromhex("b805000000c3")
+# push rbp ; mov rbp,rsp ; mov [rbp-4],5 ; mov eax,5 ; leave ; ret
+# (identical behavior, three stack-frame writes)
+X64_WITH_FRAME = bytes.fromhex("554889e5c745fc05000000b805000000c9c3")
+
+
+def test_stack_writes_do_not_affect_equivalence():
+    a = emulate_function(X64_REG_ONLY, bits=64)
+    b = emulate_function(X64_WITH_FRAME, bits=64)
+    assert not a.error and not b.error
+    assert a.return_value == b.return_value == 5
+    assert len(b.memory_writes) == 0  # frame writes filtered
+    v = compare_emulations(a, b, tolerance=0.0)
+    assert v.equivalent
+
+
+def test_nonstack_writes_still_compared():
+    # mov eax,5 ; mov dword [0x10800], 7 ; ret — a NON-stack write (absolute
+    # 32-bit addressing into the mapped code page) is observable behavior
+    glob = bytes.fromhex("b805000000" "c70500080100" "07000000" "c3")
+    a = emulate_function(X86_MOV5_RET, bits=32)
+    b = emulate_function(glob, bits=32)
+    assert not b.error
+    assert b.return_value == a.return_value == 5
+    assert len(b.memory_writes) == 1  # the non-stack write IS tracked
+    v = compare_emulations(a, b, tolerance=0.0)
+    assert not v.equivalent

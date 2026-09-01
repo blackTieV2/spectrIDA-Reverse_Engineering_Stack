@@ -304,6 +304,14 @@ def emulate_function(
         write_count = [0]
 
         def on_mem_write(uc, access, address, size, value, user_data):
+            # Stack-frame traffic (push, [ebp-n] locals, spill slots) is a
+            # compiler artifact, not observable behavior — two compilations
+            # of the same function differ in stack usage by construction
+            # (live BlackTie 2026-09-01: equivalent factorial reported
+            # MISMATCH, 3 stack writes vs 1). Observable behavior is the
+            # return value plus writes to NON-stack memory only.
+            if stack_base <= address < stack_base + stack_size:
+                return
             if write_count[0] < 1000:
                 memory_writes[int(address)] = int(value)
                 write_count[0] += 1
