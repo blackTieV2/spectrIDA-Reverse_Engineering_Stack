@@ -290,3 +290,48 @@ class TestLibrarySkipping:
         assert rep.library_skipped == 1
         # honest coverage: no work happened, so no fake 100→0 or 50→0 delta
         assert rep.coverage_end == rep.coverage_start
+
+
+class TestAgentSeams:
+    """Live wiring in mcp_server._agent_seams — the explain seam must await
+    gather_context (regression: unawaited coroutine made every explain return
+    None and the planner SKIPped the whole binary)."""
+
+    def test_explain_awaits_gather_context(self, monkeypatch):
+        import spectrida.mcp_server as srv
+        import spectrida.context as ctx_mod
+        import spectrida.core.explain as expl_mod
+
+        awaited = {"gather": False}
+
+        class FakeDB:
+            async def disasm(self, addr):
+                return [{"mnem": "mov"}]
+
+            async def decompile(self, addr):
+                return "int f() { return 5; }"
+
+        async def fake_live_db(binary):
+            return FakeDB()
+
+        from spectrida.context import FunctionContext
+
+        async def fake_gather(*a, **k):
+            awaited["gather"] = True
+            return FunctionContext(func_addr=0x1000)
+
+        sentinel = Explanation(purpose="p", suggested_name="f",
+                               confidence="high", confidence_why="t")
+
+        async def fake_explain(insns, context_block="", pseudocode=""):
+            return sentinel
+
+        monkeypatch.setattr(srv, "_live_db", fake_live_db)
+        monkeypatch.setattr(srv, "_g", lambda: object())
+        monkeypatch.setattr(ctx_mod, "gather_context", fake_gather)
+        monkeypatch.setattr(expl_mod, "explain", fake_explain)
+
+        _, _, explain, _, _ = srv._agent_seams("t")
+        out = asyncio.run(explain(0x1000))
+        assert awaited["gather"], "gather_context was never awaited"
+        assert out is sentinel

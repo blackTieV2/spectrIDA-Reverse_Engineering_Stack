@@ -682,9 +682,9 @@ async def get_context(binary: str, address: str, depth: int = 2,
         if fn:
             pseudocode = fn.get("pseudocode", "")
 
-    ctx = gather_context(_g(), binary, addr,
-                         depth=depth, max_neighbors=max_neighbors,
-                         pseudocode=pseudocode or "")
+    ctx = await gather_context(_g(), binary, addr,
+                               depth=depth, max_neighbors=max_neighbors,
+                               pseudocode=pseudocode or "")
     return {
         "address": hex(addr),
         "callers": [{"name": c.name, "addr": hex(c.addr),
@@ -732,9 +732,9 @@ async def explain_function(binary: str, address: str, depth: int = 2,
             if fn:
                 pseudocode = fn.get("pseudocode", "")
 
-    ctx = gather_context(_g(), binary, addr,
-                         depth=depth, max_neighbors=max_neighbors,
-                         pseudocode=pseudocode or "")
+    ctx = await gather_context(_g(), binary, addr,
+                               depth=depth, max_neighbors=max_neighbors,
+                               pseudocode=pseudocode or "")
     context_block = format_context_block(ctx)
 
     expl = await _explain(insns, context_block=context_block,
@@ -1249,8 +1249,8 @@ def _agent_seams(binary: str):
             pseudocode = await db.decompile(addr)
         except Exception:
             pass
-        ctx = gather_context(_g(), binary, addr, depth=2, max_neighbors=10,
-                             pseudocode=pseudocode or "")
+        ctx = await gather_context(_g(), binary, addr, depth=2, max_neighbors=10,
+                                   pseudocode=pseudocode or "")
         return await _explain(insns,
                               context_block=format_context_block(ctx),
                               pseudocode=pseudocode)
